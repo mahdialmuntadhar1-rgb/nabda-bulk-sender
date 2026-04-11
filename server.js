@@ -1,10 +1,16 @@
 import express from 'express';
 import cors from 'cors';
 import { parse } from 'csv-parse/sync';
+import { createClient } from '@supabase/supabase-js';
 import 'dotenv/config';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Initialize Supabase
+const supabaseUrl = process.env.SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 app.use(cors());
 app.use(express.json());
