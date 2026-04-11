@@ -14,16 +14,21 @@
 
 3. **Configure environment variables**
    - Copy `.env.example` to `.env` (if not exists)
-   - Fill in required Nabda credentials (see below)
+   - Fill in required Nabda API key (see below)
 
 ## Required Environment Variables
 
 Edit `.env` file and fill these values:
 
-- **NABDA_API_URL**: Your Nabda API base URL (default: `https://api.nabdaotp.com`)
-- **NABDA_INSTANCE_ID**: Your Nabda instance ID (get from Nabda dashboard)
-- **NABDA_API_TOKEN**: Your Nabda API token (get from Nabda dashboard)
+- **NABDA_BASE_URL**: Nabda API base URL (default: `https://api.nabdaotp.com`)
+- **NABDA_API_TOKEN**: Your Nabda API key (get from Nabda dashboard - Credentials section)
 - **WEBHOOK_PORT**: Port for webhook server (default: `3000`)
+
+**Get API Key from Nabda Dashboard:**
+1. Go to your Nabda dashboard
+2. Navigate to your instance
+3. Find "Credentials" section
+4. Copy the API token (starts with `sk_`)
 
 ## CSV Format Requirements
 
@@ -42,7 +47,7 @@ Edit `.env` file and fill these values:
 - `7701234567` (without leading 0)
 - `9647701234567` (without plus)
 
-All formats are normalized to `+9647701234567` before sending.
+**Important:** Phone numbers are sent with the `+` prefix to the API (e.g., `+9647701234567`).
 
 ## Template Format
 
@@ -79,7 +84,7 @@ npm run dev -- send --csv examples/recipients.csv --template examples/message.tx
 npm run dev -- send --csv examples/recipients.csv --template examples/message.txt
 ```
 
-**With options:**
+**With safe rate limiting:**
 ```bash
 npm run dev -- send \
   --csv examples/recipients.csv \
@@ -88,7 +93,6 @@ npm run dev -- send \
   --concurrency 1 \
   --batch-size 10 \
   --batch-delay-ms 2000 \
-  --resume \
   --log ./campaign-log.jsonl
 ```
 
@@ -111,8 +115,8 @@ The webhook automatically:
 
 ## Common Failure Points
 
-1. **Missing env vars**: Ensure `NABDA_INSTANCE_ID` and `NABDA_API_TOKEN` are set in `.env`
-2. **Invalid phone numbers**: Check CSV phone column - must be Iraqi format
+1. **Missing API key**: Ensure `NABDA_API_TOKEN` is set in `.env` (get from Nabda dashboard)
+2. **Invalid phone numbers**: API expects phone with `+` prefix (e.g., `+9647701234567`)
 3. **No opt-in**: Recipients with `opt_in=false` are skipped
 4. **API errors**: Check Nabda credentials and API URL
 5. **Rate limiting**: Use default delays (2s between batches) to avoid bans
@@ -139,4 +143,25 @@ Each log entry includes:
 ✅ Dry run shows preview messages
 ✅ CSV phone numbers normalize correctly
 ✅ Template variables render correctly
-✅ Real send command executes (requires valid Nabda credentials)
+✅ Real send command executes (requires valid Nabda API key)
+
+## Quick Start
+
+```bash
+# 1. Install
+npm install
+
+# 2. Configure .env with your Nabda API key
+# NABDA_BASE_URL=https://api.nabdaotp.com
+# NABDA_API_TOKEN=sk_your_api_key_here
+# WEBHOOK_PORT=3000
+
+# 3. Build
+npm run build
+
+# 4. Test dry run
+npm run dev -- send --csv examples/recipients.csv --template examples/message.txt --dry-run
+
+# 5. Send for real
+npm run dev -- send --csv examples/recipients.csv --template examples/message.txt
+```
