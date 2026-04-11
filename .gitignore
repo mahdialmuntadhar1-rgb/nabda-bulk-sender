@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+send-log.jsonl
+opt-outs.json
+db.sqlite
+.DS_Store
+*.csv
+!examples/*.csv

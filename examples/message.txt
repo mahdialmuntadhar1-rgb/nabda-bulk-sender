@@ -1,0 +1,10 @@
+Hello {{name}},
+
+Thank you for your interest in our {{category}} services in {{governorate}}.
+
+We have exciting updates for you! Please reply if you'd like to learn more.
+
+To opt out of future messages, reply STOP.
+
+Best regards,
+Your Service Team
