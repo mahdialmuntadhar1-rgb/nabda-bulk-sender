@@ -30,6 +30,20 @@
             </div>
             
             <div id="supabaseSection" class="upload-area" style="display: none;">
+                <button onclick="checkTables()">Check All Tables</button>
+                <span id="tablesStatus"></span>
+                <div id="tablesList"></div>
+                <select id="tableName">
+                    <option value="contacts">contacts</option>
+                    <option value="users">users</option>
+                    <option value="customers">customers</option>
+                    <option value="leads">leads</option>
+                    <option value="subscribers">subscribers</option>
+                    <option value="clients">clients</option>
+                    <option value="members">members</option>
+                    <option value="profiles">profiles</option>
+                    <option value="accounts">accounts</option>
+                </select>
                 <button onclick="loadSupabase()">Load from Supabase</button>
                 <span id="supabaseStatus"></span>
             </div>

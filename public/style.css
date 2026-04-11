@@ -201,3 +201,28 @@ textarea:focus {
     color: #666;
     margin-top: 5px;
 }
+
+.table-item {
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    border-left: 3px solid #28a745;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.table-item button {
+    padding: 6px 12px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.table-item button:hover {
+    background: #5568d3;
+}

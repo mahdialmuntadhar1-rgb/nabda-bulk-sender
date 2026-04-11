@@ -18,8 +18,9 @@ app.use(express.static('public'));
 
 app.get('/api/contacts', async (req, res) => {
   try {
+    const table = req.query.table || 'contacts';
     const { data, error } = await supabase
-      .from('contacts')
+      .from(table)
       .select('*');
 
     if (error) throw error;
@@ -90,6 +91,36 @@ app.post('/api/send', async (req, res) => {
     res.json({ success: true, results });
   } catch (error) {
     console.error('Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/tables', async (req, res) => {
+  try {
+    // Try common table names and check their record counts
+    const commonTables = ['contacts', 'users', 'customers', 'leads', 'subscribers', 'clients', 'members', 'profiles', 'accounts'];
+    const foundTables = [];
+    
+    for (const table of commonTables) {
+      try {
+        const { count, error: countError } = await supabase
+          .from(table)
+          .select('*', { count: 'exact', head: true });
+        
+        if (!countError) {
+          foundTables.push({ name: table, count: count || 0 });
+        }
+      } catch (e) {
+        // Table doesn't exist or access denied, skip
+      }
+    }
+    
+    if (foundTables.length === 0) {
+      res.json({ success: true, tables: [], message: 'No common table names found. Please check your Supabase dashboard for the exact table name.' });
+    } else {
+      res.json({ success: true, tables: foundTables });
+    }
+  } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });

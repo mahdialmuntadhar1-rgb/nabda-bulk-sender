@@ -47,16 +47,17 @@ async function loadSupabase() {
     const status = document.getElementById('supabaseStatus');
     const preview = document.getElementById('csvPreview');
     const sendBtn = document.getElementById('sendBtn');
+    const tableName = document.getElementById('tableName').value;
 
     status.textContent = 'Loading...';
 
     try {
-        const response = await fetch('/api/contacts');
+        const response = await fetch(`/api/contacts?table=${tableName}`);
         const data = await response.json();
         
         if (data.success) {
             supabaseContacts = data.contacts;
-            status.textContent = `Loaded ${data.contacts.length} contacts from Supabase`;
+            status.textContent = `Loaded ${data.contacts.length} contacts from ${tableName}`;
             
             preview.innerHTML = data.contacts.slice(0, 5).map(c => 
                 `<div>${c.phone} - ${c.name || 'No name'}</div>`
@@ -117,6 +118,44 @@ async function sendMessages() {
     }
 
     sendBtn.disabled = false;
+}
+
+async function checkTables() {
+    const status = document.getElementById('tablesStatus');
+    const tablesList = document.getElementById('tablesList');
+
+    status.textContent = 'Checking tables...';
+    tablesList.innerHTML = '';
+
+    try {
+        const response = await fetch('/api/tables');
+        const data = await response.json();
+        
+        if (data.success) {
+            if (data.tables.length === 0) {
+                status.textContent = 'No tables found';
+                tablesList.innerHTML = data.message || 'Please check your Supabase dashboard for the exact table name.';
+                return;
+            }
+            
+            status.textContent = `Found ${data.tables.length} tables`;
+            tablesList.innerHTML = data.tables.map(t => 
+                `<div class="table-item">
+                    <strong>${t.name}</strong>: ${t.count} records
+                    ${t.count > 0 ? `<button onclick="selectTable('${t.name}')">Use this table</button>` : ''}
+                </div>`
+            ).join('');
+        } else {
+            status.textContent = 'Error: ' + data.error;
+        }
+    } catch (error) {
+        status.textContent = 'Error: ' + error.message;
+    }
+}
+
+function selectTable(tableName) {
+    const select = document.getElementById('tableName');
+    select.value = tableName;
 }
 
 async function loadResponses() {
