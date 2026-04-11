@@ -21,6 +21,10 @@
                     <input type="radio" name="source" value="supabase" onchange="toggleSource()">
                     Supabase Database
                 </label>
+                <label>
+                    <input type="radio" name="source" value="single" onchange="toggleSource()">
+                    Single Phone
+                </label>
             </div>
             
             <div id="csvSection" class="upload-area">
@@ -34,6 +38,8 @@
                 <span id="tablesStatus"></span>
                 <div id="tablesList"></div>
                 <select id="tableName">
+                    <option value="business">business</option>
+                    <option value="staging">staging</option>
                     <option value="contacts">contacts</option>
                     <option value="users">users</option>
                     <option value="customers">customers</option>
@@ -44,8 +50,15 @@
                     <option value="profiles">profiles</option>
                     <option value="accounts">accounts</option>
                 </select>
+                <button onclick="copyToContacts()">Copy to Contacts Table</button>
                 <button onclick="loadSupabase()">Load from Supabase</button>
                 <span id="supabaseStatus"></span>
+            </div>
+
+            <div id="singleSection" class="upload-area" style="display: none;">
+                <input type="text" id="singlePhone" placeholder="+9647701234567">
+                <button onclick="loadSingle()">Add Phone</button>
+                <span id="singleStatus"></span>
             </div>
             
             <div class="preview" id="csvPreview"></div>

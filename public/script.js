@@ -1,18 +1,26 @@
 let csvData = '';
 let supabaseContacts = [];
+let singleContact = null;
 
 function toggleSource() {
     const source = document.querySelector('input[name="source"]:checked').value;
     const csvSection = document.getElementById('csvSection');
     const supabaseSection = document.getElementById('supabaseSection');
+    const singleSection = document.getElementById('singleSection');
     const sendBtn = document.getElementById('sendBtn');
     
     if (source === 'csv') {
         csvSection.style.display = 'flex';
         supabaseSection.style.display = 'none';
-    } else {
+        singleSection.style.display = 'none';
+    } else if (source === 'supabase') {
         csvSection.style.display = 'none';
         supabaseSection.style.display = 'flex';
+        singleSection.style.display = 'none';
+    } else if (source === 'single') {
+        csvSection.style.display = 'none';
+        supabaseSection.style.display = 'none';
+        singleSection.style.display = 'flex';
     }
     
     sendBtn.disabled = true;
@@ -72,6 +80,28 @@ async function loadSupabase() {
     }
 }
 
+function loadSingle() {
+    const phone = document.getElementById('singlePhone').value.trim();
+    const status = document.getElementById('singleStatus');
+    const preview = document.getElementById('csvPreview');
+    const sendBtn = document.getElementById('sendBtn');
+
+    if (!phone) {
+        status.textContent = 'Please enter a phone number';
+        return;
+    }
+
+    if (!phone.startsWith('+')) {
+        status.textContent = 'Phone must start with + (e.g., +9647701234567)';
+        return;
+    }
+
+    singleContact = { phone, name: 'Test Contact' };
+    status.textContent = `Added: ${phone}`;
+    preview.innerHTML = `<div>${phone} - Test Contact</div>`;
+    sendBtn.disabled = false;
+}
+
 async function sendMessages() {
     const source = document.querySelector('input[name="source"]:checked').value;
     const message = document.getElementById('message').value;
@@ -80,7 +110,7 @@ async function sendMessages() {
     const progress = document.getElementById('progress');
     const results = document.getElementById('results');
 
-    if ((source === 'csv' && !csvData) || (source === 'supabase' && supabaseContacts.length === 0) || !message) {
+    if ((source === 'csv' && !csvData) || (source === 'supabase' && supabaseContacts.length === 0) || (source === 'single' && !singleContact) || !message) {
         alert('Please load contacts and write a message');
         return;
     }
@@ -96,7 +126,7 @@ async function sendMessages() {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ source, csvData, message, ctaType })
+            body: JSON.stringify({ source, csvData, message, ctaType, singleContact })
         });
 
         const data = await response.json();
@@ -156,6 +186,44 @@ async function checkTables() {
 function selectTable(tableName) {
     const select = document.getElementById('tableName');
     select.value = tableName;
+}
+
+async function copyToContacts() {
+    const sourceTable = document.getElementById('tableName').value;
+    const status = document.getElementById('supabaseStatus');
+
+    if (!sourceTable) {
+        alert('Please select a source table first');
+        return;
+    }
+
+    if (sourceTable === 'contacts') {
+        alert('Source table cannot be the same as destination');
+        return;
+    }
+
+    status.textContent = 'Copying contacts...';
+
+    try {
+        const response = await fetch('/api/copy-contacts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sourceTable })
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+            status.textContent = data.message;
+            alert(`${data.message}\nTotal: ${data.total}\nDuplicates removed: ${data.duplicates}`);
+        } else {
+            status.textContent = 'Error: ' + data.error;
+            alert('Error: ' + data.error);
+        }
+    } catch (error) {
+        status.textContent = 'Error: ' + error.message;
+        alert('Error: ' + error.message);
+    }
 }
 
 async function loadResponses() {

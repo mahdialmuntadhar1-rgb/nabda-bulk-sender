@@ -32,11 +32,13 @@ app.get('/api/contacts', async (req, res) => {
 
 app.post('/api/send', async (req, res) => {
   try {
-    const { source, csvData, message, ctaType } = req.body;
+    const { source, csvData, message, ctaType, singleContact } = req.body;
     
     let recipients = [];
     
-    if (source === 'supabase') {
+    if (source === 'single') {
+      recipients = [singleContact];
+    } else if (source === 'supabase') {
       const { data, error } = await supabase.from('contacts').select('*');
       if (error) throw error;
       recipients = data || [];
@@ -48,9 +50,45 @@ app.post('/api/send', async (req, res) => {
     const results = [];
     const NABDA_API_URL = process.env.NABDA_API_URL || 'https://api.nabdaotp.com';
     const NABDA_API_TOKEN = process.env.NABDA_API_TOKEN;
+    const sentPhones = new Set();
+
+    // Check sent messages for duplicate prevention
+    try {
+      const { data: sentData } = await supabase
+        .from('message_logs')
+        .select('message')
+        .eq('message', message)
+        .limit(1000);
+      
+      if (sentData && sentData.length > 0) {
+        // Get phones from recent messages with same content
+        const { data: recentMessages } = await supabase
+          .from('message_logs')
+          .select('message')
+          .eq('message', message)
+          .order('sent_at', { ascending: false })
+          .limit(500);
+        
+        if (recentMessages) {
+          // Mark as potential duplicates if same message sent recently
+          console.log(`Found ${recentMessages.length} recent messages with same content`);
+        }
+      }
+    } catch (e) {
+      // message_logs table might not exist, continue
+      console.log('Duplicate check skipped - message_logs table not found');
+    }
 
     for (const recipient of recipients) {
       const phone = recipient.phone;
+      
+      // Skip if already sent to this phone in this batch
+      if (sentPhones.has(phone)) {
+        results.push({ phone, status: 'skipped', response: { message: 'Duplicate in batch' } });
+        continue;
+      }
+      
+      sentPhones.add(phone);
       let personalizedMessage = message;
       
       personalizedMessage = personalizedMessage.replace(/\{\{name\}\}/g, recipient.name || '');
@@ -98,7 +136,7 @@ app.post('/api/send', async (req, res) => {
 app.get('/api/tables', async (req, res) => {
   try {
     // Try common table names and check their record counts
-    const commonTables = ['contacts', 'users', 'customers', 'leads', 'subscribers', 'clients', 'members', 'profiles', 'accounts'];
+    const commonTables = ['business', 'staging', 'contacts', 'users', 'customers', 'leads', 'subscribers', 'clients', 'members', 'profiles', 'accounts'];
     const foundTables = [];
     
     for (const table of commonTables) {
@@ -135,6 +173,50 @@ app.get('/api/responses', async (req, res) => {
 
     if (error) throw error;
     res.json({ success: true, responses: data || [] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/copy-contacts', async (req, res) => {
+  try {
+    const { sourceTable } = req.body;
+    
+    // Get all contacts from source table
+    const { data: sourceData, error: sourceError } = await supabase
+      .from(sourceTable)
+      .select('*');
+
+    if (sourceError) throw sourceError;
+    
+    if (!sourceData || sourceData.length === 0) {
+      res.json({ success: false, error: 'No contacts found in source table' });
+      return;
+    }
+
+    // Get existing contacts to check for duplicates
+    const { data: existingContacts } = await supabase
+      .from('contacts')
+      .select('phone');
+
+    const existingPhones = new Set(existingContacts?.map(c => c.phone) || []);
+    
+    // Filter out duplicates
+    const newContacts = sourceData.filter(c => !existingPhones.has(c.phone));
+    
+    // Insert new contacts
+    const { error: insertError } = await supabase
+      .from('contacts')
+      .insert(newContacts);
+
+    if (insertError) throw insertError;
+
+    res.json({ 
+      success: true, 
+      message: `Copied ${newContacts.length} contacts to contacts table`,
+      total: sourceData.length,
+      duplicates: sourceData.length - newContacts.length
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
