@@ -20,8 +20,7 @@ app.get('/api/contacts', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('contacts')
-      .select('*')
-      .eq('opt_in', true);
+      .select('*');
 
     if (error) throw error;
     res.json({ success: true, contacts: data || [] });
@@ -37,7 +36,7 @@ app.post('/api/send', async (req, res) => {
     let recipients = [];
     
     if (source === 'supabase') {
-      const { data, error } = await supabase.from('contacts').select('*').eq('opt_in', true);
+      const { data, error } = await supabase.from('contacts').select('*');
       if (error) throw error;
       recipients = data || [];
     } else {
