@@ -42,6 +42,9 @@ app.post('/api/send', async (req, res) => {
     if (source === 'single') {
       recipients = [singleContact];
     } else if (source === 'supabase') {
+      if (!supabase) {
+        return res.status(500).json({ success: false, error: 'Supabase not configured' });
+      }
       const { data, error } = await supabase.from('contacts').select('*');
       if (error) throw error;
       recipients = data || [];
@@ -102,31 +105,29 @@ app.post('/api/send', async (req, res) => {
       const response = await fetch(`${NABDA_API_URL}/api/v1/messages/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': NABDA_API_TOKEN },
-        body: JSON.stringify({ phone, message: personalizedMessage })
+        body: JSON.stringify({
+          phone: phone,
+          message: personalizedMessage,
+          cta_type: ctaType
+        })
       });
 
-      const result = await response.json();
-      
-      if (supabaseUrl && supabaseKey) {
+      const responseData = await response.json();
+      results.push({ phone, status: response.ok ? 'success' : 'failed', response: responseData });
+
+      // Log to Supabase if configured
+      if (supabase) {
         try {
-          let contactId = recipient.id;
-          if (!contactId && source === 'csv') {
-            const { data: contactData } = await supabase.from('contacts').upsert({
-              phone, name: recipient.name, governorate: recipient.governorate, category: recipient.category, opt_in: true
-            }, { onConflict: 'phone' }).select();
-            contactId = contactData?.[0]?.id;
-          }
-          if (contactId) {
-            await supabase.from('message_logs').insert({
-              contact_id: contactId, message: personalizedMessage, cta_type: ctaType || null, status: response.ok ? 'sent' : 'failed'
-            });
-          }
+          await supabase.from('message_logs').insert({
+            phone,
+            message: personalizedMessage,
+            cta_type: ctaType,
+            sent_at: new Date().toISOString()
+          });
         } catch (logError) {
-          console.error('Error logging to Supabase:', logError);
+          console.error('Failed to log to Supabase:', logError);
         }
       }
-
-      results.push({ phone, status: response.ok ? 'sent' : 'failed', response: result });
     }
 
     res.json({ success: true, results });
@@ -234,6 +235,12 @@ app.post('/api/copy-contacts', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+// For local development
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+// Export for Vercel
+export default app;
