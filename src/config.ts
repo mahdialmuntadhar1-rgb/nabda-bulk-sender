@@ -10,6 +10,7 @@ export const CONFIG = {
 export function validateConfig(): void {
   const missing: string[] = [];
   
+  if (!CONFIG.NABDA_INSTANCE_ID) missing.push('NABDA_INSTANCE_ID');
   if (!CONFIG.NABDA_API_TOKEN) missing.push('NABDA_TOKEN or NABDA_API_TOKEN');
   
   if (missing.length > 0) {
