@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nabda Bulk Sender</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Nabda Bulk Sender</h1>
+        
+        <div class="section">
+            <h2>1. Upload CSV</h2>
+            <div class="upload-area">
+                <input type="file" id="csvFile" accept=".csv">
+                <button onclick="loadCSV()">Load CSV</button>
+                <span id="csvStatus"></span>
+            </div>
+            <div class="preview" id="csvPreview"></div>
+        </div>
+
+        <div class="section">
+            <h2>2. Write Message</h2>
+            <textarea id="message" placeholder="Hello {{name}},
+
+This is your message!
+
+Use variables: {{name}}, {{governorate}}, {{category}}, {{phone}}
+
+Reply STOP to opt out."></textarea>
+            <div class="variables">
+                <strong>Available variables:</strong>
+                {{name}}, {{governorate}}, {{category}}, {{phone}}
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>3. Send Messages</h2>
+            <button id="sendBtn" onclick="sendMessages()" disabled>Send Messages</button>
+            <div id="progress"></div>
+        </div>
+
+        <div class="section">
+            <h2>4. Results</h2>
+            <div id="results"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
