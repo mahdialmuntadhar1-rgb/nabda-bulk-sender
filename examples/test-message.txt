@@ -1,0 +1,8 @@
+Hello {{name}},
+
+This is a test message from the Nabda bulk sender system.
+
+Your phone: {{phone}}
+Location: {{governorate}}
+
+Test successful!
