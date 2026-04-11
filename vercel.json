@@ -11,9 +11,5 @@
       "src": "/(.*)",
       "dest": "/server.js"
     }
-  ],
-  "env": {
-    "NABDA_API_URL": "https://api.nabdaotp.com",
-    "NABDA_API_TOKEN": "@nabda-api-token"
-  }
+  ]
 }
