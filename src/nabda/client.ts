@@ -4,32 +4,33 @@ import { stripPlus } from '../utils/phone.js';
 
 export class NabdaClient {
   private baseUrl: string;
-  private token: string;
+  private apiKey: string;
 
   constructor() {
     this.baseUrl = CONFIG.NABDA_API_URL;
-    this.token = CONFIG.NABDA_API_TOKEN;
+    // Use API key from environment
+    this.apiKey = CONFIG.NABDA_API_TOKEN || '';
+    
+    if (!this.apiKey) {
+      throw new Error('NABDA_API_TOKEN is required in .env file');
+    }
   }
 
   async sendMessage(phone: string, message: string, attempt: number = 1): Promise<SendResult> {
-    const phoneSent = stripPlus(phone);
+    const phoneSent = phone; // Don't strip +, send as-is
     const url = `${this.baseUrl}/api/v1/messages/send`;
-    
-    console.log(`[DEBUG] Calling: ${url}`);
-    console.log(`[DEBUG] Phone: ${phoneSent}`);
     
     try {
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': this.token
+          'Authorization': this.apiKey
         },
         body: JSON.stringify({ phone: phoneSent, message })
       });
 
       const responseText = await response.text();
-      console.log(`[DEBUG] Response ${response.status}: ${responseText.slice(0, 500)}`);
       
       let data: NabdaResponse = {};
       
@@ -37,7 +38,6 @@ export class NabdaClient {
         data = JSON.parse(responseText) as NabdaResponse;
       } catch {
         // not JSON - likely HTML error page
-        console.log(`[DEBUG] Response is not JSON`);
       }
 
       const messageId = data.messageId || data.id || data.message_id;
