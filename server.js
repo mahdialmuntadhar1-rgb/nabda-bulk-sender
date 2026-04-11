@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3001;
 // Initialize Supabase
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 app.use(cors());
 app.use(express.json());
@@ -18,6 +18,9 @@ app.use(express.static('public'));
 
 app.get('/api/contacts', async (req, res) => {
   try {
+    if (!supabase) {
+      return res.status(500).json({ success: false, error: 'Supabase not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.' });
+    }
     const table = req.query.table || 'contacts';
     const { data, error } = await supabase
       .from(table)
@@ -135,6 +138,9 @@ app.post('/api/send', async (req, res) => {
 
 app.get('/api/tables', async (req, res) => {
   try {
+    if (!supabase) {
+      return res.status(500).json({ success: false, error: 'Supabase not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.' });
+    }
     // Try common table names and check their record counts
     const commonTables = ['business', 'staging', 'contacts', 'users', 'customers', 'leads', 'subscribers', 'clients', 'members', 'profiles', 'accounts'];
     const foundTables = [];
@@ -165,6 +171,9 @@ app.get('/api/tables', async (req, res) => {
 
 app.get('/api/responses', async (req, res) => {
   try {
+    if (!supabase) {
+      return res.status(500).json({ success: false, error: 'Supabase not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.' });
+    }
     const { data, error } = await supabase
       .from('responses')
       .select('*, contacts(phone, name)')
@@ -180,6 +189,9 @@ app.get('/api/responses', async (req, res) => {
 
 app.post('/api/copy-contacts', async (req, res) => {
   try {
+    if (!supabase) {
+      return res.status(500).json({ success: false, error: 'Supabase not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.' });
+    }
     const { sourceTable } = req.body;
     
     // Get all contacts from source table
