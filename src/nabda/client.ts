@@ -4,18 +4,16 @@ import { stripPlus } from '../utils/phone.js';
 
 export class NabdaClient {
   private baseUrl: string;
-  private instanceId: string;
   private token: string;
 
   constructor() {
     this.baseUrl = CONFIG.NABDA_API_URL;
-    this.instanceId = CONFIG.NABDA_INSTANCE_ID;
     this.token = CONFIG.NABDA_API_TOKEN;
   }
 
   async sendMessage(phone: string, message: string, attempt: number = 1): Promise<SendResult> {
     const phoneSent = stripPlus(phone);
-    const url = `${this.baseUrl}/inst/${this.instanceId}/messages/send`;
+    const url = `${this.baseUrl}/api/v1/messages/send`;
     
     console.log(`[DEBUG] Calling: ${url}`);
     console.log(`[DEBUG] Phone: ${phoneSent}`);
@@ -25,7 +23,7 @@ export class NabdaClient {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.token}`
+          'x-api-key': this.token
         },
         body: JSON.stringify({ phone: phoneSent, message })
       });
