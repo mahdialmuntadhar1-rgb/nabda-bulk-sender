@@ -7,6 +7,8 @@ export const CONFIG = {
   NABDA_PASSWORD: process.env.NABDA_PASSWORD || '',
   NABDA_INSTANCE_ID: process.env.NABDA_INSTANCE_ID || '',
   WEBHOOK_PORT: parseInt(process.env.WEBHOOK_PORT || '3000', 10),
+  SUPABASE_URL: process.env.SUPABASE_URL || '',
+  SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || '',
 };
 
 export function validateConfig(): void {

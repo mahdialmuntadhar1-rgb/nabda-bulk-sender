@@ -1,4 +1,22 @@
 let csvData = '';
+let supabaseContacts = [];
+
+function toggleSource() {
+    const source = document.querySelector('input[name="source"]:checked').value;
+    const csvSection = document.getElementById('csvSection');
+    const supabaseSection = document.getElementById('supabaseSection');
+    const sendBtn = document.getElementById('sendBtn');
+    
+    if (source === 'csv') {
+        csvSection.style.display = 'flex';
+        supabaseSection.style.display = 'none';
+    } else {
+        csvSection.style.display = 'none';
+        supabaseSection.style.display = 'flex';
+    }
+    
+    sendBtn.disabled = true;
+}
 
 function loadCSV() {
     const fileInput = document.getElementById('csvFile');
@@ -17,7 +35,6 @@ function loadCSV() {
         csvData = e.target.result;
         status.textContent = `Loaded: ${file.name}`;
         
-        // Show preview
         const lines = csvData.split('\n').slice(0, 5);
         preview.innerHTML = lines.map(line => `<div>${line}</div>`).join('');
         
@@ -26,14 +43,44 @@ function loadCSV() {
     reader.readAsText(file);
 }
 
+async function loadSupabase() {
+    const status = document.getElementById('supabaseStatus');
+    const preview = document.getElementById('csvPreview');
+    const sendBtn = document.getElementById('sendBtn');
+
+    status.textContent = 'Loading...';
+
+    try {
+        const response = await fetch('/api/contacts');
+        const data = await response.json();
+        
+        if (data.success) {
+            supabaseContacts = data.contacts;
+            status.textContent = `Loaded ${data.contacts.length} contacts from Supabase`;
+            
+            preview.innerHTML = data.contacts.slice(0, 5).map(c => 
+                `<div>${c.phone} - ${c.name || 'No name'}</div>`
+            ).join('');
+            
+            sendBtn.disabled = false;
+        } else {
+            status.textContent = 'Error: ' + data.error;
+        }
+    } catch (error) {
+        status.textContent = 'Error: ' + error.message;
+    }
+}
+
 async function sendMessages() {
+    const source = document.querySelector('input[name="source"]:checked').value;
     const message = document.getElementById('message').value;
+    const ctaType = document.getElementById('ctaType').value;
     const sendBtn = document.getElementById('sendBtn');
     const progress = document.getElementById('progress');
     const results = document.getElementById('results');
 
-    if (!csvData || !message) {
-        alert('Please load CSV and write a message');
+    if ((source === 'csv' && !csvData) || (source === 'supabase' && supabaseContacts.length === 0) || !message) {
+        alert('Please load contacts and write a message');
         return;
     }
 
@@ -48,7 +95,7 @@ async function sendMessages() {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ csvData, message })
+            body: JSON.stringify({ source, csvData, message, ctaType })
         });
 
         const data = await response.json();
@@ -70,4 +117,34 @@ async function sendMessages() {
     }
 
     sendBtn.disabled = false;
+}
+
+async function loadResponses() {
+    const responsesDiv = document.getElementById('responses');
+    responsesDiv.innerHTML = 'Loading...';
+
+    try {
+        const response = await fetch('/api/responses');
+        const data = await response.json();
+        
+        if (data.success) {
+            if (data.responses.length === 0) {
+                responsesDiv.innerHTML = 'No responses yet';
+                return;
+            }
+            
+            responsesDiv.innerHTML = data.responses.map(r => 
+                `<div class="response-item">
+                    <strong>${r.contacts?.phone || 'Unknown'}</strong> (${r.contacts?.name || 'No name'}): 
+                    ${r.response_text} 
+                    <span class="response-type">${r.response_type}</span>
+                    <span class="response-time">${new Date(r.received_at).toLocaleString()}</span>
+                </div>`
+            ).join('');
+        } else {
+            responsesDiv.innerHTML = 'Error: ' + data.error;
+        }
+    } catch (error) {
+        responsesDiv.innerHTML = 'Error: ' + error.message;
+    }
 }

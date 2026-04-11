@@ -11,17 +11,47 @@
         <h1>📱 Nabda Bulk Sender</h1>
         
         <div class="section">
-            <h2>1. Upload CSV</h2>
-            <div class="upload-area">
+            <h2>1. Select Contact Source</h2>
+            <div class="source-selector">
+                <label>
+                    <input type="radio" name="source" value="csv" checked onchange="toggleSource()">
+                    CSV Upload
+                </label>
+                <label>
+                    <input type="radio" name="source" value="supabase" onchange="toggleSource()">
+                    Supabase Database
+                </label>
+            </div>
+            
+            <div id="csvSection" class="upload-area">
                 <input type="file" id="csvFile" accept=".csv">
                 <button onclick="loadCSV()">Load CSV</button>
                 <span id="csvStatus"></span>
             </div>
+            
+            <div id="supabaseSection" class="upload-area" style="display: none;">
+                <button onclick="loadSupabase()">Load from Supabase</button>
+                <span id="supabaseStatus"></span>
+            </div>
+            
             <div class="preview" id="csvPreview"></div>
         </div>
 
         <div class="section">
-            <h2>2. Write Message</h2>
+            <h2>2. Select CTA Type</h2>
+            <select id="ctaType">
+                <option value="">None</option>
+                <option value="link">Link Click</option>
+                <option value="call">Call Now</option>
+                <option value="reply_yes">Reply YES</option>
+                <option value="reply_info">Reply INFO</option>
+                <option value="event">Event RSVP</option>
+                <option value="offer">Limited Offer</option>
+            </select>
+        </div>
+
+        <div class="section">
+            <h2>3. Write Message</h2>
             <textarea id="message" placeholder="Hello {{name}},
 
 This is your message!
@@ -36,14 +66,20 @@ Reply STOP to opt out."></textarea>
         </div>
 
         <div class="section">
-            <h2>3. Send Messages</h2>
+            <h2>4. Send Messages</h2>
             <button id="sendBtn" onclick="sendMessages()" disabled>Send Messages</button>
             <div id="progress"></div>
         </div>
 
         <div class="section">
-            <h2>4. Results</h2>
+            <h2>5. Results</h2>
             <div id="results"></div>
+        </div>
+
+        <div class="section">
+            <h2>6. Response Tracking</h2>
+            <button onclick="loadResponses()">Load Responses</button>
+            <div id="responses"></div>
         </div>
     </div>
 
