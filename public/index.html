@@ -37,9 +37,9 @@
                 <button onclick="checkTables()">Check All Tables</button>
                 <span id="tablesStatus"></span>
                 <div id="tablesList"></div>
-                <select id="tableName">
+                <select id="tableName" onchange="populateFilters()">
                     <option value="business">business</option>
-                    <option value="staging">staging</option>
+                    <option value="staging_businesses">staging_businesses</option>
                     <option value="contacts">contacts</option>
                     <option value="users">users</option>
                     <option value="customers">customers</option>
@@ -50,6 +50,20 @@
                     <option value="profiles">profiles</option>
                     <option value="accounts">accounts</option>
                 </select>
+                <div class="filter-row">
+                    <div class="filter-item">
+                        <label>Filter by City:</label>
+                        <select id="cityFilter">
+                            <option value="">All Cities</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label>Filter by Category:</label>
+                        <select id="categoryFilter">
+                            <option value="">All Categories</option>
+                        </select>
+                    </div>
+                </div>
                 <button onclick="copyToContacts()">Copy to Contacts Table</button>
                 <button onclick="loadSupabase()">Load from Supabase</button>
                 <span id="supabaseStatus"></span>

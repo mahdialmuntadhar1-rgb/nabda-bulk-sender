@@ -9,3 +9,5 @@ db.sqlite
 .DS_Store
 *.csv
 !examples/*.csv
+
+.vercel

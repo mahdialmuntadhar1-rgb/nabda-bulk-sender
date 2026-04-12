@@ -56,11 +56,13 @@ async function loadSupabase() {
     const preview = document.getElementById('csvPreview');
     const sendBtn = document.getElementById('sendBtn');
     const tableName = document.getElementById('tableName').value;
+    const cityFilter = document.getElementById('cityFilter').value;
+    const categoryFilter = document.getElementById('categoryFilter').value;
 
     status.textContent = 'Loading...';
 
     try {
-        const response = await fetch(`/api/contacts?table=${tableName}`);
+        const response = await fetch(`/api/contacts?table=${tableName}&city=${cityFilter}&category=${categoryFilter}`);
         const data = await response.json();
         
         if (data.success) {
@@ -68,7 +70,7 @@ async function loadSupabase() {
             status.textContent = `Loaded ${data.contacts.length} contacts from ${tableName}`;
             
             preview.innerHTML = data.contacts.slice(0, 5).map(c => 
-                `<div>${c.phone} - ${c.name || 'No name'}</div>`
+                `<div>${c.phone} - ${c.name || 'No name'} (${c.city || 'No city'}, ${c.category || 'No category'})</div>`
             ).join('');
             
             sendBtn.disabled = false;
@@ -77,6 +79,33 @@ async function loadSupabase() {
         }
     } catch (error) {
         status.textContent = 'Error: ' + error.message;
+    }
+}
+
+async function populateFilters() {
+    const tableName = document.getElementById('tableName').value;
+    const cityFilter = document.getElementById('cityFilter');
+    const categoryFilter = document.getElementById('categoryFilter');
+
+    try {
+        const response = await fetch(`/api/contacts?table=${tableName}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            const contacts = data.contacts;
+            
+            // Get unique cities
+            const cities = [...new Set(contacts.map(c => c.city).filter(Boolean))].sort();
+            cityFilter.innerHTML = '<option value="">All Cities</option>' + 
+                cities.map(city => `<option value="${city}">${city}</option>`).join('');
+            
+            // Get unique categories
+            const categories = [...new Set(contacts.map(c => c.category).filter(Boolean))].sort();
+            categoryFilter.innerHTML = '<option value="">All Categories</option>' + 
+                categories.map(category => `<option value="${category}">${category}</option>`).join('');
+        }
+    } catch (error) {
+        console.error('Error populating filters:', error);
     }
 }
 
@@ -186,6 +215,7 @@ async function checkTables() {
 function selectTable(tableName) {
     const select = document.getElementById('tableName');
     select.value = tableName;
+    populateFilters();
 }
 
 async function copyToContacts() {

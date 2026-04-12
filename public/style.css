@@ -163,6 +163,31 @@ textarea:focus {
     margin: 0;
 }
 
+.source-selector label.filter-row {
+    margin: 10px 0;
+    display: flex;
+    gap: 20px;
+}
+
+.filter-item {
+    flex: 1;
+}
+
+.filter-item label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.filter-item select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1em;
+    background: white;
+}
+
 #ctaType {
     width: 100%;
     padding: 12px;

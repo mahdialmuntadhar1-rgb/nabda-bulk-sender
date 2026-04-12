@@ -27,9 +27,20 @@ app.get('/api/contacts', async (req, res) => {
       return res.status(500).json({ success: false, error: 'Supabase not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.' });
     }
     const table = req.query.table || 'contacts';
-    const { data, error } = await supabase
-      .from(table)
-      .select('*');
+    const cityFilter = req.query.city;
+    const categoryFilter = req.query.category;
+    
+    let query = supabase.from(table).select('*');
+    
+    if (cityFilter) {
+      query = query.eq('city', cityFilter);
+    }
+    
+    if (categoryFilter) {
+      query = query.eq('category', categoryFilter);
+    }
+    
+    const { data, error } = await query;
 
     if (error) throw error;
     res.json({ success: true, contacts: data || [] });
@@ -40,7 +51,7 @@ app.get('/api/contacts', async (req, res) => {
 
 app.post('/api/send', async (req, res) => {
   try {
-    const { source, csvData, message, ctaType, singleContact } = req.body;
+    const { source, csvData, message, ctaType, singleContact, campaignId } = req.body;
     
     let recipients = [];
     
@@ -62,13 +73,156 @@ app.post('/api/send', async (req, res) => {
     const NABDA_API_URL = process.env.NABDA_API_URL || 'https://api.nabdaotp.com';
     const NABDA_API_TOKEN = process.env.NABDA_API_TOKEN;
     const sentPhones = new Set();
+    const campaignKey = campaignId || message.substring(0, 50);
 
     for (const recipient of recipients) {
-      const phone = recipient.phone;
+      let phone = recipient.phone;
+      let skipReason = null;
       
-      if (sentPhones.has(phone)) {
-        results.push({ phone, status: 'skipped', response: { message: 'Duplicate in batch' } });
+      // Normalize phone number
+      if (phone) {
+        phone = phone.trim().replace(/-/g, '').replace(/\s/g, '');
+        // Convert 07XXXXXXXXX to +9647XXXXXXXXX
+        if (phone.startsWith('07')) {
+          phone = '+964' + phone.substring(1);
+        }
+      }
+      
+      // Validate phone format - exact Iraqi mobile: +9647XXXXXXXXX (9 digits after +9647)
+      const iraqiMobilePattern = /^\+9647\d{9}$/;
+      
+      // Skip if no phone after normalization
+      if (!phone) {
+        skipReason = 'invalid_phone';
+        const originalPhone = recipient.phone || 'NULL';
+        results.push({ phone: originalPhone, status: 'skipped', response: { message: 'No valid phone' } });
+
+        if (supabase) {
+          try {
+            await supabase.from('message_logs').insert({
+              phone: originalPhone,
+              normalized_phone: originalPhone,
+              message: message,
+              cta_type: ctaType,
+              status: 'skipped',
+              error_reason: skipReason,
+              campaign_key: campaignKey,
+              sent_at: new Date().toISOString(),
+              attempted_at: new Date().toISOString()
+            });
+          } catch (logError) {
+            console.error('Failed to log to Supabase:', logError);
+          }
+        }
         continue;
+      }
+      
+      // Skip if phone contains comma (should not happen after cleanup)
+      if (phone.includes(',')) {
+        skipReason = 'invalid_phone';
+        results.push({ phone, status: 'skipped', response: { message: 'Phone contains comma' } });
+        
+        if (supabase) {
+          try {
+            await supabase.from('message_logs').insert({
+              phone: phone,
+              normalized_phone: null,
+              message: message,
+              cta_type: ctaType,
+              status: 'skipped',
+              error_reason: skipReason,
+              campaign_key: message.substring(0, 50),
+              sent_at: new Date().toISOString(),
+              attempted_at: new Date().toISOString()
+            });
+          } catch (logError) {
+            console.error('Failed to log to Supabase:', logError);
+          }
+        }
+        continue;
+      }
+      
+      // Skip if not valid Iraq mobile format
+      if (!iraqiMobilePattern.test(phone)) {
+        skipReason = 'invalid_phone';
+        results.push({ phone, status: 'skipped', response: { message: 'Invalid Iraq mobile format' } });
+        
+        if (supabase) {
+          try {
+            await supabase.from('message_logs').insert({
+              phone: phone,
+              normalized_phone: phone,
+              message: message,
+              cta_type: ctaType,
+              status: 'skipped',
+              error_reason: skipReason,
+              campaign_key: message.substring(0, 50),
+              sent_at: new Date().toISOString(),
+              attempted_at: new Date().toISOString()
+            });
+          } catch (logError) {
+            console.error('Failed to log to Supabase:', logError);
+          }
+        }
+        continue;
+      }
+      
+      // Skip if already sent to this phone in this batch
+      if (sentPhones.has(phone)) {
+        skipReason = 'duplicate_same_run';
+        results.push({ phone, status: 'skipped', response: { message: 'Duplicate in batch' } });
+        
+        if (supabase) {
+          try {
+            await supabase.from('message_logs').insert({
+              phone: phone,
+              normalized_phone: phone,
+              message: message,
+              cta_type: ctaType,
+              status: 'skipped',
+              error_reason: skipReason,
+              campaign_key: message.substring(0, 50),
+              sent_at: new Date().toISOString(),
+              attempted_at: new Date().toISOString()
+            });
+          } catch (logError) {
+            console.error('Failed to log to Supabase:', logError);
+          }
+        }
+        continue;
+      }
+      
+      // Check for previous runs with same phone and campaign/message
+      if (supabase) {
+        try {
+          const { data: previousLogs } = await supabase
+            .from('message_logs')
+            .select('id')
+            .eq('normalized_phone', phone)
+            .eq('campaign_key', campaignKey)
+            .in('status', ['sent', 'skipped'])
+            .limit(1);
+
+          if (previousLogs && previousLogs.length > 0) {
+            skipReason = 'duplicate_previous_run';
+            results.push({ phone, status: 'skipped', response: { message: 'Duplicate from previous run' } });
+
+            await supabase.from('message_logs').insert({
+              phone: phone,
+              normalized_phone: phone,
+              message: message,
+              cta_type: ctaType,
+              status: 'skipped',
+              error_reason: skipReason,
+              campaign_key: campaignKey,
+              sent_at: new Date().toISOString(),
+              attempted_at: new Date().toISOString()
+            });
+            continue;
+          }
+        } catch (checkError) {
+          console.error('Duplicate check error:', checkError);
+        }
       }
       
       sentPhones.add(phone);
@@ -90,15 +244,21 @@ app.post('/api/send', async (req, res) => {
       });
 
       const responseData = await response.json();
-      results.push({ phone, status: response.ok ? 'success' : 'failed', response: responseData });
+      const sendStatus = response.ok ? 'sent' : 'failed';
+      results.push({ phone, status: sendStatus, response: responseData });
 
       if (supabase) {
         try {
           await supabase.from('message_logs').insert({
             phone,
+            normalized_phone: phone,
             message: personalizedMessage,
             cta_type: ctaType,
-            sent_at: new Date().toISOString()
+            status: sendStatus,
+            error_reason: sendStatus === 'failed' ? JSON.stringify(responseData) : null,
+            campaign_key: campaignKey,
+            sent_at: new Date().toISOString(),
+            attempted_at: new Date().toISOString()
           });
         } catch (logError) {
           console.error('Failed to log to Supabase:', logError);
@@ -118,7 +278,7 @@ app.get('/api/tables', async (req, res) => {
     if (!supabase) {
       return res.status(500).json({ success: false, error: 'Supabase not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.' });
     }
-    const commonTables = ['business', 'staging', 'contacts', 'users', 'customers', 'leads', 'subscribers', 'clients', 'members', 'profiles', 'accounts'];
+    const commonTables = ['business', 'staging_businesses', 'contacts', 'users', 'customers', 'leads', 'subscribers', 'clients', 'members', 'profiles', 'accounts'];
     const foundTables = [];
     
     for (const table of commonTables) {
