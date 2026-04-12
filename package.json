@@ -8,7 +8,7 @@
     "dev": "tsx src/cli.ts",
     "send": "node dist/cli.js send",
     "webhook": "node dist/cli.js webhook",
-    "start": "npm run build && npm run send",
+    "start": "node server.js",
     "web": "node server.js"
   },
   "keywords": ["whatsapp", "nabda", "bulk", "messaging"],
