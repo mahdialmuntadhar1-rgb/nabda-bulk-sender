@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: nabda-bulk-sender
+    runtime: node
+    plan: free
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NABDA_BASE_URL
+        value: https://api.nabdaotp.com
+      - key: NABDA_API_TOKEN
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: WEBHOOK_PORT
+        value: "3001"
+      - key: PORT
+        value: "3001"
+    healthCheckPath: /
