@@ -1436,77 +1436,52 @@ async function loadSupabase(loadAll = false) {
         if (data.success) {
             supabaseContacts = data.contacts || [];
             const totalCount = data.totalCount || 0;
-            const loadedCount = data.loadedCount || 0;
+            const loadedCount = data.loadedCount || supabaseContacts.length;
             const isPartial = data.isPartial || false;
-            
-            console.log('Contacts loaded:', loadedCount, 'of', totalCount);
-            
-            // Build status message with clear indication of partial/full load
+            const validCount = data.validCount || 0;
+            const invalidCount = data.invalidCount || 0;
+
+            console.log('[Frontend] Contacts loaded:', loadedCount, 'of', totalCount, 'valid:', validCount, 'invalid:', invalidCount);
+
+            // Build detailed status message
             let statusMessage = '';
-            if (isPartial) {
-                statusMessage = `⚠️ PARTIAL LOAD: ${loadedCount} of ${totalCount} rows loaded`;
+            if (loadedCount === 0) {
+                statusMessage = `❌ No contacts loaded from ${tableName}`;
+            } else if (isPartial) {
+                statusMessage = `⚠️ Loaded ${loadedCount} of ${totalCount} rows (partial - click "Load All" for full dataset)`;
             } else {
-                statusMessage = `✅ FULL LOAD: ${loadedCount} of ${totalCount} rows loaded`;
+                statusMessage = `✅ Loaded ${loadedCount} rows from ${tableName} | Valid: ${validCount} | Invalid: ${invalidCount}`;
             }
             status.textContent = statusMessage;
-            
-            // Validate phones for stats
-            const phones = new Set();
-            let validPhones = 0;
-            let invalidPhones = 0;
-            let duplicateCount = 0;
-            
-            supabaseContacts.forEach(contact => {
-                let phone = contact.phone || '';
-                if (phone) {
-                    phone = phone.trim().replace(/-/g, '').replace(/\s/g, '');
-                    if (phone.startsWith('07')) {
-                        phone = '+964' + phone.substring(1);
-                    }
-                    
-                    const iraqiMobilePattern = /^\+9647\d{9}$/;
-                    if (iraqiMobilePattern.test(phone)) {
-                        validPhones++;
-                        if (phones.has(phone)) {
-                            duplicateCount++;
-                        } else {
-                            phones.add(phone);
-                        }
-                    } else {
-                        invalidPhones++;
-                    }
-                } else {
-                    invalidPhones++;
-                }
-            });
-            
-            // Build preview with clear status indicators
+
+            // Build preview with detailed breakdown
             let previewHTML = '';
-            
-            if (isPartial) {
+
+            if (loadedCount > 0) {
                 previewHTML += `
-                    <div style="background: #fff3cd; padding: 15px; border-radius: 5px; border: 2px solid #ffc107; margin-bottom: 10px;">
-                        <h3 style="margin-top: 0; color: #856404;">⚠️ Partial Dataset Loaded</h3>
-                        <p><strong>Table contains:</strong> ${totalCount} rows</p>
-                        <p><strong>Currently loaded:</strong> ${loadedCount} rows</p>
-                        <p><strong>Sending will use:</strong> Only the ${loadedCount} loaded rows</p>
-                        <button onclick="loadSupabase(true)" style="margin-top: 10px; background: #ff9800;">Load All ${totalCount} Rows</button>
+                    <div style="background: #d4edda; padding: 15px; border-radius: 5px; border: 2px solid #28a745; margin-bottom: 10px;">
+                        <h3 style="margin-top: 0; color: #155724;">✅ ${loadedCount} Contacts Loaded</h3>
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+                            <div><strong>Total Rows:</strong> ${totalCount}</div>
+                            <div><strong>Loaded:</strong> ${loadedCount}</div>
+                            <div><strong>Valid Phones:</strong> ${validCount}</div>
+                            <div><strong>Invalid Phones:</strong> ${invalidCount}</div>
+                        </div>
+                        ${isPartial ? `<button onclick="loadSupabase(true)" style="margin-top: 10px; background: #ff9800;">Load All ${totalCount} Rows</button>` : ''}
                     </div>
                 `;
             } else {
                 previewHTML += `
-                    <div style="background: #d4edda; padding: 15px; border-radius: 5px; border: 2px solid #28a745; margin-bottom: 10px;">
-                        <h3 style="margin-top: 0; color: #155724;">✅ Full Dataset Loaded</h3>
-                        <p><strong>Table contains:</strong> ${totalCount} rows</p>
-                        <p><strong>Currently loaded:</strong> ${loadedCount} rows</p>
-                        <p><strong>Sending will use:</strong> All ${loadedCount} rows</p>
+                    <div style="background: #ffebee; padding: 15px; border-radius: 5px; border: 2px solid #f44336; margin-bottom: 10px;">
+                        <h3 style="margin-top: 0; color: #c62828;">❌ No Contacts Loaded</h3>
+                        <p>Loaded: 0 rows from ${tableName}</p>
+                        <p style="font-size: 12px; color: #666;">Check: table name, filters (use "All"), and Supabase connection</p>
+                        <p style="font-size: 11px; color: #999;">See browser console (F12) for debug logs</p>
                     </div>
                 `;
             }
-            
-            if (supabaseContacts.length === 0) {
-                previewHTML += '<div style="color: orange;">No records found. Check table name or filters.</div>';
-            } else {
+
+            if (supabaseContacts.length > 0) {
                 previewHTML += `
                     <h4>Sample records (first 5):</h4>
                     ${supabaseContacts.slice(0, 5).map(c => 
@@ -2327,3 +2302,4 @@ async function loadResponses() {
         responsesDiv.innerHTML = 'Error: ' + error.message;
     }
 }
+    

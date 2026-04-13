@@ -147,30 +147,108 @@ app.post('/api/validate', async (req, res) => {
   }
 });
 
+// ============ FLEXIBLE FIELD MAPPING ============
+function mapBusinessRow(row) {
+  // Map common field names to standard contact shape
+  const name = row.business_name || row.name || row.arabic_name || 'Unknown';
+  const phone = row.whatsapp || row.phone_1 || row.phone || row.phone_2 || '';
+
+  return {
+    id: row.id || Math.random().toString(),
+    name: String(name).trim(),
+    phone: String(phone).trim(),
+    whatsapp: row.whatsapp ? String(row.whatsapp).trim() : undefined,
+    category: row.category ? String(row.category).trim() : undefined,
+    governorate: row.governorate ? String(row.governorate).trim() : undefined,
+    city: row.city ? String(row.city).trim() : undefined,
+  };
+}
+
 app.get('/api/contacts', async (req, res) => {
   try {
     if (!supabase) {
-      return res.status(500).json({ success: false, error: 'Supabase not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.' });
+      return res.status(500).json({ success: false, error: 'Supabase not configured' });
     }
-    const table = req.query.table || 'businesses';
-    const cityFilter = req.query.city;
-    const categoryFilter = req.query.category;
 
+    const table = req.query.table || 'businesses';
+    const cityFilter = req.query.city || '';
+    const categoryFilter = req.query.category || '';
+    const loadAll = req.query.loadAll === 'true';
+
+    console.log(`[Supabase] Loading from table: ${table}, city: ${cityFilter}, category: ${categoryFilter}, loadAll: ${loadAll}`);
+
+    // Build query
     let query = supabase.from(table).select('*');
 
-    if (cityFilter) {
+    // Only apply filters if specific values selected (not "All")
+    if (cityFilter && cityFilter !== '') {
       query = query.eq('city', cityFilter);
+      console.log(`[Supabase] Applied city filter: ${cityFilter}`);
     }
-
-    if (categoryFilter) {
+    if (categoryFilter && categoryFilter !== '') {
       query = query.eq('category', categoryFilter);
+      console.log(`[Supabase] Applied category filter: ${categoryFilter}`);
     }
 
-    const { data, error } = await query;
+    // Limit unless loadAll requested
+    if (!loadAll) {
+      query = query.limit(100);
+      console.log(`[Supabase] Applied limit: 100 rows`);
+    }
+
+    const { data, error, count } = await query;
 
     if (error) throw error;
-    res.json({ success: true, contacts: data || [] });
+
+    const rawCount = data ? data.length : 0;
+    console.log(`[Supabase] Raw fetched: ${rawCount} rows`);
+
+    // Show first 3 raw rows for debugging
+    if (data && data.length > 0) {
+      console.log('[Supabase] Sample raw rows:', JSON.stringify(data.slice(0, 3), null, 2));
+    }
+
+    // Map rows using flexible field mapping
+    const mappedContacts = (data || []).map(mapBusinessRow);
+    console.log(`[Supabase] Mapped: ${mappedContacts.length} rows`);
+
+    // Show first 3 mapped rows
+    if (mappedContacts.length > 0) {
+      console.log('[Supabase] Sample mapped rows:', JSON.stringify(mappedContacts.slice(0, 3), null, 2));
+    }
+
+    // Validate phones
+    let validCount = 0;
+    let invalidCount = 0;
+    const invalidReasons = {};
+
+    mappedContacts.forEach(contact => {
+      if (!contact.phone) {
+        invalidCount++;
+        invalidReasons['no_phone'] = (invalidReasons['no_phone'] || 0) + 1;
+      } else if (!/^\+?9647\d{9}$|^07\d{9}$|^9647\d{9}$/.test(contact.phone.replace(/[\s-]/g, ''))) {
+        invalidCount++;
+        invalidReasons['invalid_format'] = (invalidReasons['invalid_format'] || 0) + 1;
+      } else {
+        validCount++;
+      }
+    });
+
+    console.log(`[Supabase] Valid: ${validCount}, Invalid: ${invalidCount}`, invalidReasons);
+    console.log(`[Supabase] First 3 invalid reasons:`, Object.keys(invalidReasons).slice(0, 3).map(k => `${k}: ${invalidReasons[k]}`));
+
+    res.json({
+      success: true,
+      contacts: mappedContacts,
+      totalCount: count || rawCount,
+      loadedCount: mappedContacts.length,
+      isPartial: !loadAll && mappedContacts.length >= 100,
+      validCount,
+      invalidCount,
+      invalidReasons
+    });
   } catch (error) {
+    console.error('[Supabase] Error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
