@@ -38,17 +38,7 @@
                 <span id="tablesStatus"></span>
                 <div id="tablesList"></div>
                 <select id="tableName" onchange="populateFilters()">
-                    <option value="business">business</option>
-                    <option value="staging_businesses">staging_businesses</option>
-                    <option value="contacts">contacts</option>
-                    <option value="users">users</option>
-                    <option value="customers">customers</option>
-                    <option value="leads">leads</option>
-                    <option value="subscribers">subscribers</option>
-                    <option value="clients">clients</option>
-                    <option value="members">members</option>
-                    <option value="profiles">profiles</option>
-                    <option value="accounts">accounts</option>
+                    <option value="businesses" selected>businesses (3,641 records)</option>
                 </select>
                 <div class="filter-row">
                     <div class="filter-item">
@@ -66,6 +56,7 @@
                 </div>
                 <button onclick="copyToContacts()">Copy to Contacts Table</button>
                 <button onclick="loadSupabase()">Load from Supabase</button>
+                <button onclick="exportCSV()" style="background: #28a745;">Export CSV</button>
                 <span id="supabaseStatus"></span>
             </div>
 
@@ -76,13 +67,28 @@
             </div>
             
             <div class="preview" id="csvPreview"></div>
+            
+            <!-- CSV Preview Table -->
+            <div id="csvPreviewTableContainer" style="display: none; margin-top: 15px;">
+                <h4>CSV Preview (First 20 rows)</h4>
+                <div style="overflow-x: auto; max-height: 400px; overflow-y: auto;">
+                    <table class="csv-preview-table">
+                        <thead id="csvPreviewHeader"></thead>
+                        <tbody id="csvPreviewBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Column Mapping Display -->
+            <div id="columnMapping" style="display: none; margin-top: 15px; background: #e3f2fd; padding: 10px; border-radius: 5px; border: 2px solid #2196F3;"></div>
         </div>
 
         <div class="section">
             <h2>2. Select CTA Type</h2>
             <select id="ctaType">
-                <option value="">None</option>
+                <option value="">No CTA</option>
                 <option value="link">Link Click</option>
+                <option value="whatsapp">WhatsApp Chat</option>
                 <option value="call">Call Now</option>
                 <option value="reply_yes">Reply YES</option>
                 <option value="reply_info">Reply INFO</option>
@@ -92,14 +98,38 @@
         </div>
 
         <div class="section">
+            <h2>2.5. Poster / Image</h2>
+            <div class="poster-placeholder" style="background: #fff3cd; padding: 15px; border-radius: 5px; border: 2px dashed #ffc107; text-align: center; color: #856404;">
+                <p><strong>📷 Poster/image sending requires provider media support</strong></p>
+                <p style="font-size: 0.9em; margin-top: 5px;">This feature is not currently supported by the backend API.</p>
+            </div>
+        </div>
+
+        <div class="section">
             <h2>3. Write Message</h2>
-            <textarea id="message" placeholder="Hello {{name}},
-
-This is your message!
-
-Use variables: {{name}}, {{governorate}}, {{category}}, {{phone}}
-
-Reply STOP to opt out."></textarea>
+            
+            <div class="variable-chips">
+                <button onclick="insertVariable('{{name}}')" class="chip">+ {{name}}</button>
+                <button onclick="insertVariable('{{governorate}}')" class="chip">+ {{governorate}}</button>
+                <button onclick="insertVariable('{{category}}')" class="chip">+ {{category}}</button>
+                <button onclick="insertVariable('{{phone}}')" class="chip">+ {{phone}}</button>
+            </div>
+            
+            <div class="message-section">
+                <label>Greeting:</label>
+                <textarea id="greeting" placeholder="Hello {{name}}," rows="2"></textarea>
+            </div>
+            
+            <div class="message-section">
+                <label>Main Message:</label>
+                <textarea id="mainMessage" placeholder="Write your main message here..." rows="5"></textarea>
+            </div>
+            
+            <div class="message-section">
+                <label>Closing (Optional):</label>
+                <textarea id="closing" placeholder="Reply if interested." rows="2"></textarea>
+            </div>
+            
             <div class="variables">
                 <strong>Available variables:</strong>
                 {{name}}, {{governorate}}, {{category}}, {{phone}}
@@ -108,17 +138,180 @@ Reply STOP to opt out."></textarea>
 
         <div class="section">
             <h2>4. Send Messages</h2>
-            <button id="sendBtn" onclick="sendMessages()" disabled>Send Messages</button>
+            <div class="batch-controls">
+                <div class="batch-item">
+                    <label>
+                        Campaign Name (optional):
+                        <input type="text" id="campaignName" placeholder="My Campaign">
+                    </label>
+                </div>
+                <div class="batch-item">
+                    <label>
+                        <input type="checkbox" id="skipPreviouslyContacted">
+                        Skip previously contacted numbers
+                    </label>
+                </div>
+                <div class="batch-item">
+                    <label>
+                        Batch Size:
+                        <input type="number" id="batchSize" value="20" min="1" max="100">
+                    </label>
+                </div>
+                <div class="batch-item">
+                    <label>
+                        Delay between messages (seconds):
+                        <input type="number" id="messageDelay" value="2" min="1" max="10">
+                    </label>
+                </div>
+                <div class="batch-item">
+                    <label>
+                        Delay between batches (seconds):
+                        <input type="number" id="batchDelay" value="15" min="5" max="60">
+                    </label>
+                </div>
+                <div class="batch-item">
+                    <label>
+                        <input type="checkbox" id="randomDelay" checked>
+                        Random delay (±50%)
+                    </label>
+                </div>
+                <div class="batch-item">
+                    <label>
+                        Max Total:
+                        <input type="number" id="maxTotal" value="" placeholder="No limit">
+                    </label>
+                </div>
+                <div class="batch-item">
+                    <label>
+                        Test Mode (send to first only):
+                        <input type="checkbox" id="testMode" onchange="updateModeBadges()">
+                    </label>
+                </div>
+                <div class="batch-item">
+                    <label>
+                        Test to My Number:
+                        <input type="text" id="testPhone" placeholder="+9647XXXXXXXXX">
+                    </label>
+                    <button onclick="sendTestMessage()" style="margin-top: 5px; background: #ff9800;">Send Test</button>
+                </div>
+                <div class="batch-item">
+                    <label>
+                        <input type="checkbox" id="dryRunMode" onchange="updateModeBadges()">
+                        Dry Run (no sending)
+                    </label>
+                </div>
+            </div>
+            <div class="action-buttons">
+                <button onclick="validateCSV()">Validate CSV</button>
+                <button onclick="previewMessages()">Preview Messages</button>
+                <button onclick="debugPreviewMode()">Debug Preview</button>
+                <button onclick="showPreSendSummary()">Pre-Send Summary</button>
+                <button id="sendBtn" onclick="sendMessages()" disabled>Send Messages</button>
+                <button id="stopBtn" onclick="stopSending()" disabled>STOP</button>
+                <button id="resumeBtn" onclick="resumeSending()" disabled style="display: none;">RESUME</button>
+            </div>
+            
+            <!-- Pre-send summary box -->
+            <div id="preSendSummary" style="display: none; margin-top: 15px; background: #e3f2fd; padding: 20px; border-radius: 8px; border: 2px solid #2196F3;">
+                <h3 style="margin-top: 0; color: #2c3e50;">📋 Pre-Send Summary</h3>
+                <div id="preSendSummaryContent"></div>
+                <div style="margin-top: 15px;">
+                    <button onclick="confirmAndSend()" id="confirmSendBtn" style="background: #4CAF50; padding: 12px 24px; font-size: 16px;">✅ Confirm & Start Sending</button>
+                    <button onclick="cancelSend()" style="background: #f44336; padding: 12px 24px; font-size: 16px; margin-left: 10px;">❌ Cancel</button>
+                </div>
+                <div id="sendNowConfirmation" style="display: none; margin-top: 15px; background: #fff3cd; padding: 15px; border-radius: 8px; border: 2px solid #ffc107;">
+                    <p style="margin: 0; color: #856404;"><strong>⚠️ For 200+ contacts, type <code>SEND NOW</code> to confirm:</strong></p>
+                    <input type="text" id="sendNowInput" placeholder="Type SEND NOW" oninput="checkSendNowInput()" style="margin-top: 10px; padding: 8px; width: 200px;">
+                </div>
+            </div>
             <div id="progress"></div>
         </div>
 
         <div class="section">
-            <h2>5. Results</h2>
+            <h2>5. Results Monitor</h2>
+            <div class="stats-dashboard">
+                <div class="stat-item">
+                    <label>Total Loaded:</label>
+                    <span id="statTotal" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <label>Valid:</label>
+                    <span id="statValid" class="stat-value" style="color: #4CAF50;">0</span>
+                </div>
+                <div class="stat-item">
+                    <label>Invalid:</label>
+                    <span id="statInvalid" class="stat-value" style="color: #f44336;">0</span>
+                </div>
+                <div class="stat-item">
+                    <label>Duplicates:</label>
+                    <span id="statDuplicates" class="stat-value" style="color: #ff9800;">0</span>
+                </div>
+                <div class="stat-item">
+                    <label>Pending:</label>
+                    <span id="statPending" class="stat-value" style="color: #2196F3;">0</span>
+                </div>
+                <div class="stat-item">
+                    <label>Sent:</label>
+                    <span id="statSent" class="stat-value" style="color: #4CAF50;">0</span>
+                </div>
+                <div class="stat-item">
+                    <label>Failed:</label>
+                    <span id="statFailed" class="stat-value" style="color: #f44336;">0</span>
+                </div>
+                <div class="stat-item">
+                    <label>Skipped:</label>
+                    <span id="statSkipped" class="stat-value" style="color: #ff9800;">0</span>
+                </div>
+                <div class="stat-item">
+                    <label>Remaining:</label>
+                    <span id="statRemaining" class="stat-value" style="color: #2196F3;">0</span>
+                </div>
+            </div>
+            <div class="status-badges" id="statusBadges" style="margin: 15px 0;">
+                <span class="badge" id="sourceBadge" style="display: none;"></span>
+                <span class="badge" id="modeBadge" style="display: none;"></span>
+                <span class="badge" id="campaignBadge" style="display: none;"></span>
+            </div>
+            <div id="currentRecipient" class="current-recipient" style="display: none;">
+                <strong>Current:</strong> <span id="currentRecipientName">-</span> (<span id="currentRecipientPhone">-</span>)
+            </div>
             <div id="results"></div>
         </div>
 
         <div class="section">
-            <h2>6. Response Tracking</h2>
+            <h2>6. Contacts Preview Table</h2>
+            <div class="table-controls">
+                <button onclick="showContactsTable()">Show Contacts Table</button>
+                <select id="tableFilter" onchange="filterContactsTable()" style="margin-left: 10px;">
+                    <option value="all">All</option>
+                    <option value="valid">Valid Only</option>
+                    <option value="duplicates">Duplicates</option>
+                </select>
+            </div>
+            <div id="contactsTableContainer" style="display: none;">
+                <table class="contacts-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>Governorate</th>
+                            <th>Category</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="contactsTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>7. Results</h2>
+            <div id="results"></div>
+        </div>
+
+        <div class="section">
+            <h2>8. Response Tracking</h2>
             <button onclick="loadResponses()">Load Responses</button>
             <div id="responses"></div>
         </div>

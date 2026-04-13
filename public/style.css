@@ -251,3 +251,256 @@ textarea:focus {
 .table-item button:hover {
     background: #5568d3;
 }
+
+/* Message sections */
+.message-section {
+    margin-bottom: 15px;
+}
+
+.message-section label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #333;
+    font-size: 1em;
+}
+
+.message-section textarea {
+    min-height: 80px;
+}
+
+/* Variable chips */
+.variable-chips {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+.chip {
+    padding: 6px 12px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.9em;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.chip:hover {
+    background: #5568d3;
+}
+
+/* Mode badges */
+.mode-badges {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.badge {
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.badge-dry-run {
+    background: #fff3cd;
+    color: #856404;
+    border: 2px solid #ffc107;
+}
+
+.badge-test {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 2px solid #17a2b8;
+}
+
+.badge-live {
+    background: #d4edda;
+    color: #155724;
+    border: 2px solid #28a745;
+}
+
+/* Stats dashboard */
+.stats-dashboard {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.stat-item {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    border: 2px solid #e9ecef;
+    text-align: center;
+}
+
+.stat-item label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #555;
+    font-size: 0.9em;
+}
+
+.stat-value {
+    font-size: 1.5em;
+    font-weight: 700;
+    color: #333;
+}
+
+.stat-valid {
+    color: #28a745;
+}
+
+.stat-invalid {
+    color: #dc3545;
+}
+
+.stat-warning {
+    color: #ffc107;
+}
+
+.stat-pending {
+    color: #6c757d;
+}
+
+.stat-sent {
+    color: #28a745;
+}
+
+.stat-failed {
+    color: #dc3545;
+}
+
+.stat-skipped {
+    color: #ffc107;
+}
+
+.stat-remaining {
+    color: #17a2b8;
+}
+
+/* Current recipient */
+.current-recipient {
+    padding: 12px;
+    background: #e3f2fd;
+    border-radius: 6px;
+    border: 2px solid #2196F3;
+    font-size: 0.95em;
+    margin-top: 10px;
+}
+
+/* Contacts table */
+.table-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+
+.contacts-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.contacts-table th,
+.contacts-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.contacts-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #333;
+    font-size: 0.9em;
+}
+
+.contacts-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+/* Batch controls */
+.batch-controls {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+.batch-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.batch-item label {
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #333;
+    font-size: 0.9em;
+}
+
+.batch-item input[type="number"] {
+    padding: 10px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 1em;
+}
+
+.batch-item input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+.batch-item label:has(input[type="checkbox"]) {
+    display: flex;
+    align-items: center;
+}
+
+/* Action buttons */
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.action-buttons button {
+    flex: 1;
+    min-width: 120px;
+}
+
+#stopBtn {
+    background: #dc3545;
+}
+
+#stopBtn:hover:not(:disabled) {
+    background: #c82333;
+}
+
+/* Larger text and clearer spacing */
+h2 {
+    font-size: 1.4em;
+    font-weight: 700;
+}
+
+textarea,
+input[type="text"],
+input[type="number"],
+select {
+    font-size: 1.05em;
+}
+
+.section {
+    padding: 25px;
+}

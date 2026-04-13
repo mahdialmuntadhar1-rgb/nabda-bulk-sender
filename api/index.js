@@ -26,7 +26,7 @@ app.get('/api/contacts', async (req, res) => {
     if (!supabase) {
       return res.status(500).json({ success: false, error: 'Supabase not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.' });
     }
-    const table = req.query.table || 'contacts';
+    const table = req.query.table || 'businesses';
     const cityFilter = req.query.city;
     const categoryFilter = req.query.category;
     
@@ -61,7 +61,7 @@ app.post('/api/send', async (req, res) => {
       if (!supabase) {
         return res.status(500).json({ success: false, error: 'Supabase not configured' });
       }
-      const { data, error } = await supabase.from('contacts').select('*');
+      const { data, error } = await supabase.from('businesses').select('*');
       if (error) throw error;
       recipients = data || [];
     } else {
@@ -278,7 +278,7 @@ app.get('/api/tables', async (req, res) => {
     if (!supabase) {
       return res.status(500).json({ success: false, error: 'Supabase not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.' });
     }
-    const commonTables = ['business', 'staging_businesses', 'contacts', 'users', 'customers', 'leads', 'subscribers', 'clients', 'members', 'profiles', 'accounts'];
+    const commonTables = ['businesses', 'business', 'staging_businesses', 'contacts', 'users', 'customers', 'leads', 'subscribers', 'clients', 'members', 'profiles', 'accounts'];
     const foundTables = [];
     
     for (const table of commonTables) {
