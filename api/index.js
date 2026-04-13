@@ -21,6 +21,132 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 app.use(express.static(path.join(__dirname, '../public')));
 
+// ============ UNIFIED PHONE NORMALIZATION ============
+// SINGLE SOURCE OF TRUTH used everywhere
+function normalizePhoneNumber(phone) {
+  if (!phone || typeof phone !== 'string') return null;
+
+  let normalized = phone.trim()
+    .replace(/\s/g, '')
+    .replace(/-/g, '')
+    .replace(/,/g, '')
+    .replace(/\./g, '');
+
+  if (!normalized) return null;
+  if (normalized.startsWith('+')) normalized = normalized.substring(1);
+  normalized = normalized.replace(/[^\d]/g, '');
+  if (!normalized) return null;
+
+  // Rule 1: 07XXXXXXXXX (11 digits)
+  if (normalized.length === 11 && normalized.startsWith('07')) {
+    return '+964' + normalized.substring(1);
+  }
+  // Rule 2: 7XXXXXXXXX (10 digits)
+  if (normalized.length === 10 && normalized.startsWith('7')) {
+    return '+964' + normalized;
+  }
+  // Rule 3: 9647XXXXXXXXX (12 digits)
+  if (normalized.length === 12 && normalized.startsWith('9647')) {
+    return '+' + normalized;
+  }
+  // Rule 4: Already +964...
+  if (normalized.length === 13 && normalized.startsWith('964')) {
+    return '+' + normalized;
+  }
+
+  return null;
+}
+
+function isValidIraqiPhone(phone) {
+  if (!phone || typeof phone !== 'string') return false;
+  const normalized = normalizePhoneNumber(phone);
+  if (!normalized) return false;
+  const iraqiPattern = /^\+9647\d{9}$/;
+  return iraqiPattern.test(normalized);
+}
+
+function detectLanguage(text) {
+  if (!text || typeof text !== 'string') return 'unknown';
+  const arabicRegex = /[\u0600-\u06FF]/g;
+  const arabicMatches = text.match(arabicRegex);
+  const kurdishKeywords = ['کورد', 'کردی', 'سۆرانی', 'کورمانجی', 'ئاراپی'];
+  const isKurdishText = kurdishKeywords.some(k => text.includes(k));
+
+  if (isKurdishText) return 'kurdish';
+  if (arabicMatches && arabicMatches.length / text.length > 0.4) return 'arabic';
+  return 'unknown';
+}
+
+// ============ VALIDATION ENDPOINT ============
+app.post('/api/validate', async (req, res) => {
+  try {
+    const { source, csvData, singleContact } = req.body;
+
+    let rows = [];
+    if (source === 'csv') {
+      rows = parse(csvData, { columns: true, skip_empty_lines: true });
+    } else if (source === 'single') {
+      rows = [{ phone: singleContact, name: 'Test Contact' }];
+    } else if (source === 'supabase') {
+      if (!supabase) return res.status(500).json({ success: false, error: 'Supabase not configured' });
+      const table = req.body.table || 'businesses';
+      const { data, error } = await supabase.from(table).select('*');
+      if (error) throw error;
+      rows = data || [];
+    }
+
+    const results = {
+      total: rows.length,
+      valid: 0,
+      invalid: 0,
+      duplicates: 0,
+      normalized_count: 0,
+      invalid_reasons: {},
+      contacts: []
+    };
+
+    const seenPhones = new Set();
+    const normalized = [];
+
+    for (const row of rows) {
+      const phone_original = row.phone || '';
+      const phone_normalized = normalizePhoneNumber(phone_original);
+      const isValid = isValidIraqiPhone(phone_original);
+
+      if (!isValid) {
+        results.invalid++;
+        const reason = !phone_normalized ? 'format_invalid' : 'not_iraqi_mobile';
+        results.invalid_reasons[reason] = (results.invalid_reasons[reason] || 0) + 1;
+        continue;
+      }
+
+      results.valid++;
+      results.normalized_count++;
+
+      if (seenPhones.has(phone_normalized)) {
+        results.duplicates++;
+        continue;
+      }
+
+      seenPhones.add(phone_normalized);
+      normalized.push({
+        business_name: row.name || row.business_name || 'N/A',
+        phone_original,
+        phone_normalized,
+        language_detected: detectLanguage(row.name || row.business_name || ''),
+        governorate: row.governorate || '',
+        city: row.city || '',
+        category: row.category || ''
+      });
+    }
+
+    results.contacts = normalized.slice(0, 20);
+    res.json({ success: true, results });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.get('/api/contacts', async (req, res) => {
   try {
     if (!supabase) {
@@ -29,17 +155,17 @@ app.get('/api/contacts', async (req, res) => {
     const table = req.query.table || 'businesses';
     const cityFilter = req.query.city;
     const categoryFilter = req.query.category;
-    
+
     let query = supabase.from(table).select('*');
-    
+
     if (cityFilter) {
       query = query.eq('city', cityFilter);
     }
-    
+
     if (categoryFilter) {
       query = query.eq('category', categoryFilter);
     }
-    
+
     const { data, error } = await query;
 
     if (error) throw error;
@@ -49,228 +175,204 @@ app.get('/api/contacts', async (req, res) => {
   }
 });
 
-app.post('/api/send', async (req, res) => {
+// ============ DRY RUN (no actual sends) ============
+app.post('/api/dry-run', async (req, res) => {
   try {
-    const { source, csvData, message, ctaType, singleContact, campaignId } = req.body;
-    
-    let recipients = [];
-    
-    if (source === 'single') {
-      recipients = [singleContact];
+    const { source, csvData, message, singleContact, table } = req.body;
+
+    let rows = [];
+    if (source === 'csv') {
+      rows = parse(csvData, { columns: true, skip_empty_lines: true });
+    } else if (source === 'single') {
+      rows = [{ phone: singleContact, name: 'Test' }];
     } else if (source === 'supabase') {
-      if (!supabase) {
-        return res.status(500).json({ success: false, error: 'Supabase not configured' });
-      }
-      const { data, error } = await supabase.from('businesses').select('*');
+      if (!supabase) return res.status(500).json({ success: false, error: 'Supabase not configured' });
+      const { data, error } = await supabase.from(table || 'businesses').select('*');
       if (error) throw error;
-      recipients = data || [];
-    } else {
-      recipients = parse(csvData, { columns: true, skip_empty_lines: true });
-      recipients = recipients.filter(r => r.opt_in === 'true' || r.opt_in === '1' || r.opt_in === 'yes');
+      rows = data || [];
     }
 
-    const results = [];
+    const results = {
+      would_send: 0,
+      would_skip: 0,
+      invalid: 0,
+      summary: []
+    };
+
+    const seenPhones = new Set();
+    const logs = [];
+
+    for (const row of rows) {
+      const phone_original = row.phone || '';
+      const phone_normalized = normalizePhoneNumber(phone_original);
+      const isValid = isValidIraqiPhone(phone_original);
+      const business_name = row.name || row.business_name || 'N/A';
+
+      let status = 'would_send';
+      let reason = null;
+
+      if (!isValid) {
+        status = 'would_skip';
+        reason = 'invalid_format';
+        results.invalid++;
+      } else if (seenPhones.has(phone_normalized)) {
+        status = 'would_skip';
+        reason = 'duplicate_batch';
+        results.would_skip++;
+      } else {
+        seenPhones.add(phone_normalized);
+        results.would_send++;
+      }
+
+      if (status === 'would_skip' && reason) {
+        results.would_skip++;
+      }
+
+      logs.push({
+        phone: phone_normalized || phone_original,
+        business_name,
+        status,
+        reason
+      });
+    }
+
+    results.summary = logs.slice(0, 10);
+    res.json({ success: true, results });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============ REAL SEND ============
+app.post('/api/send', async (req, res) => {
+  try {
+    const { source, csvData, message, singleContact, campaignId, table } = req.body;
+
+    let rows = [];
+    if (source === 'csv') {
+      rows = parse(csvData, { columns: true, skip_empty_lines: true });
+    } else if (source === 'single') {
+      rows = [{ phone: singleContact, name: 'Test' }];
+    } else if (source === 'supabase') {
+      if (!supabase) return res.status(500).json({ success: false, error: 'Supabase not configured' });
+      const { data, error } = await supabase.from(table || 'businesses').select('*');
+      if (error) throw error;
+      rows = data || [];
+    }
+
+    const results = {
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+      logs: []
+    };
+
     const NABDA_API_URL = process.env.NABDA_API_URL || 'https://api.nabdaotp.com';
     const NABDA_API_TOKEN = process.env.NABDA_API_TOKEN;
-    const sentPhones = new Set();
+    const seenPhones = new Set();
     const campaignKey = campaignId || message.substring(0, 50);
 
-    for (const recipient of recipients) {
-      let phone = recipient.phone;
-      let skipReason = null;
-      
-      // Normalize phone number
-      if (phone) {
-        phone = phone.trim().replace(/-/g, '').replace(/\s/g, '');
-        // Convert 07XXXXXXXXX to +9647XXXXXXXXX
-        if (phone.startsWith('07')) {
-          phone = '+964' + phone.substring(1);
-        }
-      }
-      
-      // Validate phone format - exact Iraqi mobile: +9647XXXXXXXXX (9 digits after +9647)
-      const iraqiMobilePattern = /^\+9647\d{9}$/;
-      
-      // Skip if no phone after normalization
-      if (!phone) {
-        skipReason = 'invalid_phone';
-        const originalPhone = recipient.phone || 'NULL';
-        results.push({ phone: originalPhone, status: 'skipped', response: { message: 'No valid phone' } });
+    for (const row of rows) {
+      const phone_original = row.phone || '';
+      const phone_normalized = normalizePhoneNumber(phone_original);
+      const business_name = row.name || row.business_name || 'N/A';
 
-        if (supabase) {
-          try {
-            await supabase.from('message_logs').insert({
-              phone: originalPhone,
-              normalized_phone: originalPhone,
-              message: message,
-              cta_type: ctaType,
-              status: 'skipped',
-              error_reason: skipReason,
-              campaign_key: campaignKey,
-              sent_at: new Date().toISOString(),
-              attempted_at: new Date().toISOString()
-            });
-          } catch (logError) {
-            console.error('Failed to log to Supabase:', logError);
-          }
-        }
+      // Validate
+      if (!isValidIraqiPhone(phone_original)) {
+        results.skipped++;
+        results.logs.push({
+          phone: phone_original,
+          business_name,
+          status: 'skipped',
+          reason: 'invalid_format',
+          timestamp: new Date().toISOString()
+        });
         continue;
       }
-      
-      // Skip if phone contains comma (should not happen after cleanup)
-      if (phone.includes(',')) {
-        skipReason = 'invalid_phone';
-        results.push({ phone, status: 'skipped', response: { message: 'Phone contains comma' } });
-        
-        if (supabase) {
-          try {
-            await supabase.from('message_logs').insert({
-              phone: phone,
-              normalized_phone: null,
-              message: message,
-              cta_type: ctaType,
-              status: 'skipped',
-              error_reason: skipReason,
-              campaign_key: message.substring(0, 50),
-              sent_at: new Date().toISOString(),
-              attempted_at: new Date().toISOString()
-            });
-          } catch (logError) {
-            console.error('Failed to log to Supabase:', logError);
-          }
-        }
+
+      // Check duplicates in batch
+      if (seenPhones.has(phone_normalized)) {
+        results.skipped++;
+        results.logs.push({
+          phone: phone_normalized,
+          business_name,
+          status: 'skipped',
+          reason: 'duplicate_batch',
+          timestamp: new Date().toISOString()
+        });
         continue;
       }
-      
-      // Skip if not valid Iraq mobile format
-      if (!iraqiMobilePattern.test(phone)) {
-        skipReason = 'invalid_phone';
-        results.push({ phone, status: 'skipped', response: { message: 'Invalid Iraq mobile format' } });
-        
-        if (supabase) {
-          try {
-            await supabase.from('message_logs').insert({
-              phone: phone,
-              normalized_phone: phone,
-              message: message,
-              cta_type: ctaType,
-              status: 'skipped',
-              error_reason: skipReason,
-              campaign_key: message.substring(0, 50),
-              sent_at: new Date().toISOString(),
-              attempted_at: new Date().toISOString()
-            });
-          } catch (logError) {
-            console.error('Failed to log to Supabase:', logError);
-          }
+
+      seenPhones.add(phone_normalized);
+
+      // Render message (replace placeholders)
+      let rendered_message = message;
+      rendered_message = rendered_message.replace(/\{\{name\}\}/g, row.name || row.business_name || 'Hello');
+      rendered_message = rendered_message.replace(/\{\{governorate\}\}/g, row.governorate || '');
+      rendered_message = rendered_message.replace(/\{\{category\}\}/g, row.category || '');
+      rendered_message = rendered_message.replace(/\{\{phone\}\}/g, phone_normalized);
+
+      // Send via Nabda
+      let sendStatus = 'failed';
+      let errorReason = null;
+
+      try {
+        const payload = {
+          phone: phone_normalized,
+          message: rendered_message
+        };
+
+        const response = await fetch(`${NABDA_API_URL}/api/v1/messages/send`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${NABDA_API_TOKEN}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+          sendStatus = 'sent';
+          results.sent++;
+        } else {
+          errorReason = `HTTP ${response.status}`;
+          results.failed++;
         }
-        continue;
+      } catch (err) {
+        errorReason = err.message;
+        results.failed++;
       }
-      
-      // Skip if already sent to this phone in this batch
-      if (sentPhones.has(phone)) {
-        skipReason = 'duplicate_same_run';
-        results.push({ phone, status: 'skipped', response: { message: 'Duplicate in batch' } });
-        
-        if (supabase) {
-          try {
-            await supabase.from('message_logs').insert({
-              phone: phone,
-              normalized_phone: phone,
-              message: message,
-              cta_type: ctaType,
-              status: 'skipped',
-              error_reason: skipReason,
-              campaign_key: message.substring(0, 50),
-              sent_at: new Date().toISOString(),
-              attempted_at: new Date().toISOString()
-            });
-          } catch (logError) {
-            console.error('Failed to log to Supabase:', logError);
-          }
-        }
-        continue;
-      }
-      
-      // Check for previous runs with same phone and campaign/message
-      if (supabase) {
-        try {
-          const { data: previousLogs } = await supabase
-            .from('message_logs')
-            .select('id')
-            .eq('normalized_phone', phone)
-            .eq('campaign_key', campaignKey)
-            .in('status', ['sent', 'skipped'])
-            .limit(1);
 
-          if (previousLogs && previousLogs.length > 0) {
-            skipReason = 'duplicate_previous_run';
-            results.push({ phone, status: 'skipped', response: { message: 'This number was already contacted in a previous campaign or earlier in this session.' } });
-
-            await supabase.from('message_logs').insert({
-              phone: phone,
-              normalized_phone: phone,
-              message: message,
-              cta_type: ctaType,
-              status: 'skipped',
-              error_reason: skipReason,
-              campaign_key: campaignKey,
-              sent_at: new Date().toISOString(),
-              attempted_at: new Date().toISOString()
-            });
-            continue;
-          }
-        } catch (checkError) {
-          console.error('Duplicate check error:', checkError);
-        }
-      }
-      
-      sentPhones.add(phone);
-      let personalizedMessage = message;
-      
-      personalizedMessage = personalizedMessage.replace(/\{\{name\}\}/g, recipient.name || '');
-      personalizedMessage = personalizedMessage.replace(/\{\{governorate\}\}/g, recipient.governorate || '');
-      personalizedMessage = personalizedMessage.replace(/\{\{category\}\}/g, recipient.category || '');
-      personalizedMessage = personalizedMessage.replace(/\{\{phone\}\}/g, phone || '');
-
-      const payload = {
-        phone: phone,
-        message: personalizedMessage
-      };
-      console.log('Sending payload keys:', Object.keys(payload));
-
-      const response = await fetch(`${NABDA_API_URL}/api/v1/messages/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': NABDA_API_TOKEN },
-        body: JSON.stringify(payload)
-      });
-
-      const responseData = await response.json();
-      const sendStatus = response.ok ? 'sent' : 'failed';
-      results.push({ phone, status: sendStatus, response: responseData });
-
+      // Log to Supabase
       if (supabase) {
         try {
           await supabase.from('message_logs').insert({
-            phone,
-            normalized_phone: phone,
-            message: personalizedMessage,
-            cta_type: ctaType,
+            phone: phone_normalized,
+            business_name,
+            message: rendered_message,
             status: sendStatus,
-            error_reason: sendStatus === 'failed' ? JSON.stringify(responseData) : null,
+            error_reason: errorReason,
             campaign_key: campaignKey,
-            sent_at: new Date().toISOString(),
-            attempted_at: new Date().toISOString()
+            language_detected: detectLanguage(business_name),
+            sent_at: new Date().toISOString()
           });
-        } catch (logError) {
-          console.error('Failed to log to Supabase:', logError);
+        } catch (logErr) {
+          console.error('Log error:', logErr);
         }
       }
+
+      results.logs.push({
+        phone: phone_normalized,
+        business_name,
+        status: sendStatus,
+        reason: errorReason,
+        timestamp: new Date().toISOString()
+      });
     }
 
     res.json({ success: true, results });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Send error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -372,4 +474,11 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
+// Export for development
 export default app;
+
+// Start server if run directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}

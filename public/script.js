@@ -1,3 +1,40 @@
+// ============ UNIFIED PHONE NORMALIZATION ============
+// SINGLE SOURCE OF TRUTH - used in validation, preview, deduplication, sending
+function normalizePhoneNumber(phone) {
+    if (!phone || typeof phone !== 'string') return null;
+    let normalized = phone.trim()
+        .replace(/\s/g, '')
+        .replace(/-/g, '')
+        .replace(/,/g, '')
+        .replace(/\./g, '');
+    if (!normalized) return null;
+    if (normalized.startsWith('+')) normalized = normalized.substring(1);
+    normalized = normalized.replace(/[^\d]/g, '');
+    if (!normalized) return null;
+    if (normalized.length === 11 && normalized.startsWith('07')) return '+964' + normalized.substring(1);
+    if (normalized.length === 10 && normalized.startsWith('7')) return '+964' + normalized;
+    if (normalized.length === 12 && normalized.startsWith('9647')) return '+' + normalized;
+    if (normalized.length === 13 && normalized.startsWith('964')) return '+' + normalized;
+    return null;
+}
+
+function isValidIraqiPhone(phone) {
+    if (!phone || typeof phone !== 'string') return false;
+    const normalized = normalizePhoneNumber(phone);
+    if (!normalized) return false;
+    return /^\+9647\d{9}$/.test(normalized);
+}
+
+function detectLanguage(text) {
+    if (!text || typeof text !== 'string') return 'unknown';
+    const arabicRegex = /[\u0600-\u06FF]/g;
+    const arabicMatches = text.match(arabicRegex);
+    const kurdishKeywords = ['کورد', 'کردی', 'سۆرانی', 'کورمانجی', 'ئاراپی'];
+    if (kurdishKeywords.some(k => text.includes(k))) return 'kurdish';
+    if (arabicMatches && arabicMatches.length / text.length > 0.4) return 'arabic';
+    return 'unknown';
+}
+
 let csvData = '';
 let csvParsedData = [];
 let supabaseContacts = [];
