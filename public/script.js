@@ -509,7 +509,7 @@ function toggleSource() {
     
     // Check message fields
     const greeting = document.getElementById('greeting').value;
-    const mainMessage = document.getElementById('mainMessage').value;
+    const mainMessage = document.getElementById('message').value;
     const hasMessage = greeting || mainMessage;
 
     if (source === 'csv') {
