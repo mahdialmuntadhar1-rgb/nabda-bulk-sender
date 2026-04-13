@@ -76,7 +76,179 @@ function dismissCampaign() {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     checkActiveCampaign();
+    updateCharCounter();
+    updateSourceClarity();
+    updateCampaignStatus('Ready');
+    
+    // Add event listener for test mode
+    const testMode = document.getElementById('testMode');
+    if (testMode) {
+        testMode.addEventListener('change', updateTestModeBanner);
+    }
+    
+    // Add event listener for source changes
+    const sourceRadios = document.querySelectorAll('input[name="source"]');
+    sourceRadios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            updateSourceClarity();
+            updateSendButtonState();
+        });
+    });
+    
+    // Add event listeners for message inputs
+    const greeting = document.getElementById('greeting');
+    const message = document.getElementById('message');
+    const closing = document.getElementById('closing');
+    
+    if (greeting) greeting.addEventListener('input', () => {
+        updateCharCounter();
+        updateSendButtonState();
+    });
+    if (message) message.addEventListener('input', () => {
+        updateCharCounter();
+        updateSendButtonState();
+    });
+    if (closing) closing.addEventListener('input', () => {
+        updateCharCounter();
+        updateSendButtonState();
+    });
 });
+
+// Update character counter
+function updateCharCounter() {
+    const message = getCombinedMessage();
+    const currentLength = document.getElementById('currentLength');
+    const charWarning = document.getElementById('charWarning');
+    const sendBtn = document.getElementById('sendBtn');
+    
+    currentLength.textContent = message.length;
+    
+    if (message.length > 255) {
+        currentLength.style.color = '#f44336';
+        charWarning.style.display = 'inline';
+        if (sendBtn) sendBtn.disabled = true;
+    } else {
+        currentLength.style.color = '#4CAF50';
+        charWarning.style.display = 'none';
+        // Only enable send button if other conditions are met
+        updateSendButtonState();
+    }
+    
+    // Update message preview
+    updateMessagePreview();
+}
+
+// Update message preview with placeholder resolution
+function updateMessagePreview() {
+    const message = getCombinedMessage();
+    const preview = document.getElementById('finalMessagePreview');
+    const resolution = document.getElementById('placeholderResolution');
+    
+    if (!message || message.trim() === '') {
+        preview.textContent = 'Type your message above to see the preview...';
+        resolution.textContent = '';
+        return;
+    }
+    
+    // Show a sample preview with placeholder resolution
+    const sampleContact = {
+        name: 'Ahmed Cafe',
+        governororate: 'Baghdad',
+        category: 'Restaurant',
+        phone: '+9647XXXXXXXXX'
+    };
+    
+    const previewMessage = safeReplaceVariables(message, sampleContact);
+    preview.textContent = previewMessage;
+    
+    // Show placeholder resolution info
+    const hasName = message.includes('{{name}}');
+    const hasGovernorate = message.includes('{{governorate}}');
+    const hasCategory = message.includes('{{category}}');
+    const hasPhone = message.includes('{{phone}}');
+    
+    let resolutionText = '';
+    if (hasName) resolutionText += '{{name}} → "Ahmed Cafe" ';
+    if (hasGovernorate) resolutionText += '{{governorate}} → "Baghdad" ';
+    if (hasCategory) resolutionText += '{{category}} → "Restaurant" ';
+    if (hasPhone) resolutionText += '{{phone}} → "+9647XXXXXXXXX" ';
+    
+    resolution.textContent = resolutionText || 'No placeholders in message';
+}
+
+// Update test mode banner visibility
+function updateTestModeBanner() {
+    const testMode = document.getElementById('testMode');
+    const banner = document.getElementById('testModeBanner');
+    
+    if (testMode && testMode.checked) {
+        banner.style.display = 'block';
+    } else {
+        banner.style.display = 'none';
+    }
+}
+
+// Update contact source clarity
+function updateSourceClarity() {
+    const source = document.querySelector('input[name="source"]:checked').value;
+    const sourceClarity = document.getElementById('sourceClarity');
+    const sourceType = document.getElementById('sourceType');
+    const sourceDetails = document.getElementById('sourceDetails');
+    
+    if (!sourceClarity) return;
+    
+    sourceClarity.style.display = 'block';
+    
+    let details = '';
+    if (source === 'csv') {
+        sourceType.textContent = 'CSV File';
+        details = `Loaded: ${csvParsedData.length} contacts`;
+    } else if (source === 'supabase') {
+        sourceType.textContent = 'Supabase Database';
+        const tableName = document.getElementById('tableName').value;
+        details = `Table: ${tableName || 'Not selected'} | Loaded: ${supabaseContacts.length} contacts`;
+    } else if (source === 'single') {
+        sourceType.textContent = 'Single Phone';
+        details = `Test mode: single number`;
+    }
+    
+    sourceDetails.textContent = details;
+}
+
+// Update campaign status indicator
+function updateCampaignStatus(status) {
+    const statusBadge = document.getElementById('statusBadge');
+    if (!statusBadge) return;
+    
+    const statusColors = {
+        'Ready': '#4CAF50',
+        'Sending': '#2196F3',
+        'Stopped': '#ff9800',
+        'Completed': '#4CAF50',
+        'Error': '#f44336'
+    };
+    
+    statusBadge.textContent = status;
+    statusBadge.style.background = statusColors[status] || '#6c757d';
+}
+
+// Update send button state based on all conditions
+function updateSendButtonState() {
+    const sendBtn = document.getElementById('sendBtn');
+    if (!sendBtn) return;
+    
+    const source = document.querySelector('input[name="source"]:checked').value;
+    const message = getCombinedMessage();
+    const lengthCheck = validateMessageLength(message);
+    
+    let hasContacts = false;
+    if (source === 'csv') hasContacts = csvParsedData.length > 0;
+    else if (source === 'supabase') hasContacts = supabaseContacts.length > 0;
+    else if (source === 'single') hasContacts = singleContact !== null;
+    
+    const canSend = hasContacts && message && message.length > 0 && lengthCheck.valid;
+    sendBtn.disabled = !canSend;
+}
 
 // Shared phone normalization helper - ensures consistency across frontend and backend
 function normalizePhoneNumber(phone) {
@@ -96,6 +268,23 @@ function normalizePhoneNumber(phone) {
 function isValidIraqiPhone(phone) {
     const iraqiMobilePattern = /^\+9647\d{9}$/;
     return iraqiMobilePattern.test(phone);
+}
+
+// Validate message length (max 255 characters)
+function validateMessageLength(message) {
+    if (message.length > 255) {
+        return {
+            valid: false,
+            length: message.length,
+            max: 255,
+            error: `Final message is too long for provider limit (255 characters). Please shorten it. Current: ${message.length} characters.`
+        };
+    }
+    return {
+        valid: true,
+        length: message.length,
+        max: 255
+    };
 }
 
 // Safe variable replacement with fallbacks to prevent broken messages
@@ -131,15 +320,16 @@ function safeReplaceVariables(message, contact) {
 // Helper function to get combined message from the three fields
 function getCombinedMessage() {
     const greeting = document.getElementById('greeting').value;
-    const mainMessage = document.getElementById('mainMessage').value;
+    const mainMessage = document.getElementById('message').value;
     const closing = document.getElementById('closing').value;
     
-    let combined = '';
-    if (greeting) combined += greeting + '\n';
-    if (mainMessage) combined += mainMessage + '\n';
-    if (closing) combined += closing;
+    // Trim each part and join cleanly without double blank lines
+    const parts = [];
+    if (greeting) parts.push(greeting.trim());
+    if (mainMessage) parts.push(mainMessage.trim());
+    if (closing) parts.push(closing.trim());
     
-    return combined.trim();
+    return parts.join('\n\n').trim();
 }
 
 // Insert variable into the currently focused textarea
@@ -679,6 +869,18 @@ function showPreSendSummary() {
                 <p><strong>⚡ Mode:</strong> <span style="color: ${modeColor}; font-weight: bold;">${mode}</span></p>
             </div>
         </div>
+        ${duplicateCount > 0 ? `
+            <div style="margin-top: 15px; background: #fff3cd; padding: 10px; border-radius: 5px; border: 2px solid #ffc107;">
+                <p style="margin: 0; color: #856404;"><strong>Duplicates found:</strong> ${duplicateCount} contacts</p>
+                <p style="font-size: 0.9em; color: #666;">These numbers have already been contacted in previous campaigns or earlier in this session.</p>
+                <p style="font-size: 0.9em; color: #666;">To fix this:</p>
+                <ul style="font-size: 0.9em; color: #666; margin-left: 20px;">
+                    <li>Use a new campaign name</li>
+                    <li>Disable "Skip previously contacted numbers" for testing</li>
+                    <li>Use a different phone number</li>
+                </ul>
+            </div>
+        ` : ''}
         ${invalidPhones > 0 ? `
             <div style="margin-top: 15px; background: #fee; padding: 10px; border-radius: 5px; border: 1px solid #fcc;">
                 <p style="margin: 0; color: #c00;"><strong>⚠️ Invalid Numbers Preview (first 10):</strong> ${invalidPhoneList.join(', ')}</p>
@@ -692,6 +894,34 @@ function showPreSendSummary() {
     `;
     
     document.getElementById('preSendSummaryContent').innerHTML = summaryHTML;
+    
+    // Build pre-send checklist
+    const checklist = document.getElementById('checklistItems');
+    const lengthCheck = validateMessageLength(message);
+    if (checklist) {
+        let checklistHTML = '';
+        
+        // Data loaded
+        checklistHTML += `<div style="color: ${validPhones > 0 ? '#4CAF50' : '#f44336'};">${validPhones > 0 ? '✅' : '❌'} Data loaded: ${validPhones} valid contacts</div>`;
+        
+        // Valid contacts count
+        checklistHTML += `<div style="color: ${validPhones > 0 ? '#4CAF50' : '#f44336'};">${validPhones > 0 ? '✅' : '❌'} Valid contacts count: ${validPhones}</div>`;
+        
+        // Message length valid
+        checklistHTML += `<div style="color: ${lengthCheck.valid ? '#4CAF50' : '#f44336'};">${lengthCheck.valid ? '✅' : '❌'} Message length valid: ${lengthCheck.length} / 255</div>`;
+        
+        // No missing required fields
+        checklistHTML += `<div style="color: ${invalidPhones === 0 ? '#4CAF50' : '#f44336'};">${invalidPhones === 0 ? '✅' : '❌'} No missing required fields: ${invalidPhones} invalid contacts</div>`;
+        
+        // Mode (Test / Real)
+        checklistHTML += `<div style="color: #4CAF50;">✅ Mode: ${testMode ? 'Test Mode' : 'Real Sending Mode'}</div>`;
+        
+        // Campaign name
+        checklistHTML += `<div style="color: ${campaignName ? '#4CAF50' : '#ff9800'};">${campaignName ? '✅' : '⚠️'} Campaign name: ${campaignName || 'Auto-generated'}</div>`;
+        
+        checklist.innerHTML = checklistHTML;
+    }
+    
     document.getElementById('preSendSummary').style.display = 'block';
     
     // Store summary data for confirmation
@@ -1010,6 +1240,13 @@ async function sendTestMessage() {
         return;
     }
     
+    // Validate message length
+    const lengthCheck = validateMessageLength(message);
+    if (!lengthCheck.valid) {
+        alert(lengthCheck.error);
+        return;
+    }
+    
     // Normalize phone number
     let normalizedPhone = testPhone.replace(/-/g, '').replace(/\s/g, '').replace(/,/g, '');
     if (normalizedPhone.startsWith('07')) {
@@ -1071,6 +1308,25 @@ async function sendTestMessage() {
                         <p><strong>Status:</strong> Sent</p>
                     </div>
                 `;
+                if (response.ok) {
+                    const results = document.getElementById('results');
+                    results.innerHTML = `<div style="background: #c8e6c9; padding: 15px; border-radius: 5px; border: 2px solid #4CAF50;">
+                        <h3 style="margin-top: 0;">✅ Message sent successfully to ${normalizedPhone}</h3>
+                        <p><strong>Status:</strong> ${data.success ? 'Sent' : 'Failed'}</p>
+                        <p><strong>Response:</strong> ${JSON.stringify(data)}</p>
+                    </div>`;
+                    
+                    // Show payload debug
+                    const payloadDebug = document.getElementById('payloadDebug');
+                    if (payloadDebug) {
+                        payloadDebug.style.display = 'block';
+                        document.getElementById('payloadKeys').textContent = 'Payload keys: ["phone", "message"]';
+                        document.getElementById('lastPayload').textContent = JSON.stringify({
+                            phone: normalizedPhone,
+                            message: message
+                        }, null, 2);
+                    }
+                }
             } else {
                 progress.innerHTML = `
                     <div style="background: #f8d7da; padding: 15px; border-radius: 5px; border: 2px solid #dc3545;">
@@ -1239,6 +1495,9 @@ async function loadSupabase(loadAll = false) {
                 skipped: 0,
                 remaining: phones.size
             });
+            
+            updateSourceClarity();
+            updateSendButtonState();
         } else {
             status.textContent = 'Error: ' + (data.error || 'Unknown error');
             preview.innerHTML = `<div style="color: red;">${data.error || 'Unknown error'}</div>`;
@@ -1373,6 +1632,9 @@ function validateCSV() {
         skipped: 0,
         remaining: phones.size
     });
+    
+    updateSourceClarity();
+    updateSendButtonState();
 }
 
 function previewMessages() {
@@ -1471,6 +1733,16 @@ async function sendMessages() {
         alert('Please load contacts and write a message');
         return;
     }
+    
+    // Validate message length
+    const lengthCheck = validateMessageLength(message);
+    if (!lengthCheck.valid) {
+        alert(lengthCheck.error);
+        sendBtn.disabled = false;
+        stopBtn.disabled = true;
+        progress.style.display = 'none';
+        return;
+    }
 
     // Check for CSV validation errors
     if (source === 'csv' && csvValidationErrors.length > 0) {
@@ -1496,6 +1768,9 @@ async function sendMessages() {
     resumeBtn.style.display = 'none';
     progress.style.display = 'block';
     results.innerHTML = '';
+    
+    // Update campaign status to sending
+    updateCampaignStatus('Sending');
 
     try {
         let contacts = [];
@@ -1804,6 +2079,8 @@ async function sendMessages() {
                             console.error('Failed to update campaign session on stop:', updateError);
                         }
                     }
+                    // Update campaign status to stopped
+                    updateCampaignStatus('Stopped');
                     progress.innerHTML = '<div style="color: orange;">⚠️ Stopped by user</div>';
                     break;
                 }
@@ -1826,6 +2103,49 @@ async function sendMessages() {
                 </div>
             `;
             
+            // Update campaign status to completed
+            updateCampaignStatus('Completed');
+            
+            // Show duplicate reasons if any
+            if (duplicateCount > 0) {
+                progress.innerHTML += `
+                    <p style="color: orange;"><strong>Duplicates found:</strong> ${duplicateCount} contacts</p>
+                    <p style="font-size: 0.9em; color: #666;">These numbers have already been contacted in previous campaigns or earlier in this session.</p>
+                    <p style="font-size: 0.9em; color: #666;">To fix this:</p>
+                    <ul style="font-size: 0.9em; color: #666; margin-left: 20px;">
+                        <li>Use a new campaign name</li>
+                        <li>Disable "Skip previously contacted numbers" for testing</li>
+                        <li>Use a different phone number</li>
+                    </ul>
+                `;
+            }
+            
+            // Build pre-send checklist
+            const checklist = document.getElementById('checklistItems');
+            if (checklist) {
+                let checklistHTML = '';
+                
+                // Data loaded
+                checklistHTML += `<div style="color: ${validPhones > 0 ? '#4CAF50' : '#f44336'};">${validPhones > 0 ? '✅' : '❌'} Data loaded: ${validPhones} valid contacts</div>`;
+                
+                // Valid contacts count
+                checklistHTML += `<div style="color: ${validPhones > 0 ? '#4CAF50' : '#f44336'};">${validPhones > 0 ? '✅' : '❌'} Valid contacts count: ${validPhones}</div>`;
+                
+                // Message length valid
+                checklistHTML += `<div style="color: ${lengthCheck.valid ? '#4CAF50' : '#f44336'};">${lengthCheck.valid ? '✅' : '❌'} Message length valid: ${lengthCheck.length} / 255</div>`;
+                
+                // No missing required fields
+                checklistHTML += `<div style="color: ${invalidPhones === 0 ? '#4CAF50' : '#f44336'};">${invalidPhones === 0 ? '✅' : '❌'} No missing required fields: ${invalidPhones} invalid contacts</div>`;
+                
+                // Mode (Test / Real)
+                checklistHTML += `<div style="color: #4CAF50;">✅ Mode: ${testMode ? 'Test Mode' : 'Real Sending Mode'}</div>`;
+                
+                // Campaign name
+                checklistHTML += `<div style="color: ${campaignName ? '#4CAF50' : '#ff9800'};">${campaignName ? '✅' : '⚠️'} Campaign name: ${campaignName || 'Auto-generated'}</div>`;
+                
+                checklist.innerHTML = checklistHTML;
+            }
+
             // Mark campaign session as completed
             if (sendingProgress.session) {
                 try {

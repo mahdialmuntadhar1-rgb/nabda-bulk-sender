@@ -258,8 +258,8 @@ app.post('/api/send', async (req, res) => {
       
       // Skip if previously contacted (if enabled)
       if (skipPreviouslyContacted && previouslyContactedPhones.has(phone)) {
-        skipReason = 'previously_contacted';
-        results.push({ phone, status: 'skipped', response: { message: 'Previously contacted in other campaigns' } });
+        skipReason = 'duplicate_previous';
+        results.push({ phone, status: 'skipped', response: { message: 'This number was already contacted in a previous campaign or earlier in this session.' } });
         
         if (supabase) {
           try {
@@ -365,14 +365,16 @@ app.post('/api/send', async (req, res) => {
       
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
+          const payload = {
+            phone: phone,
+            message: personalizedMessage
+          };
+          console.log('Sending payload keys:', Object.keys(payload));
+          
           response = await fetch(`${NABDA_API_URL}/api/v1/messages/send`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': NABDA_API_TOKEN },
-            body: JSON.stringify({
-              phone: phone,
-              message: personalizedMessage,
-              cta_type: ctaType
-            })
+            body: JSON.stringify(payload)
           });
 
           responseData = await response.json();

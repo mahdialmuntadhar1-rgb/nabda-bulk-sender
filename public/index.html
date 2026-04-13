@@ -10,6 +10,22 @@
     <div class="container">
         <h1>📱 Nabda Bulk Sender</h1>
         
+        <!-- Campaign Status Indicator -->
+        <div class="campaign-status" id="campaignStatus">
+            <span class="status-badge" id="statusBadge" style="background: #4CAF50;">Ready</span>
+        </div>
+        
+        <!-- Test Mode Banner -->
+        <div class="test-mode-banner" id="testModeBanner" style="display: none; background: #fff3cd; padding: 10px; border-radius: 5px; border: 2px solid #ffc107; margin-bottom: 15px;">
+            <strong>🧪 Test Mode Active</strong> — messages will only be sent to your test number
+        </div>
+        
+        <!-- Contact Source Clarity -->
+        <div class="source-clarity" id="sourceClarity" style="display: none; background: #e3f2fd; padding: 10px; border-radius: 5px; border: 2px solid #2196F3; margin-bottom: 15px;">
+            <strong>Source:</strong> <span id="sourceType">-</span>
+            <span id="sourceDetails" style="margin-left: 15px;"></span>
+        </div>
+        
         <div class="section">
             <h2>1. Select Contact Source</h2>
             <div class="source-selector">
@@ -106,38 +122,46 @@
         </div>
 
         <div class="section">
-            <h2>3. Write Message</h2>
-            
-            <div class="variable-chips">
-                <button onclick="insertVariable('{{name}}')" class="chip">+ {{name}}</button>
-                <button onclick="insertVariable('{{governorate}}')" class="chip">+ {{governorate}}</button>
-                <button onclick="insertVariable('{{category}}')" class="chip">+ {{category}}</button>
-                <button onclick="insertVariable('{{phone}}')" class="chip">+ {{phone}}</button>
+            <h2>4. Write Message</h2>
+            <div class="message-inputs">
+                <div class="message-part">
+                    <label>Greeting:</label>
+                    <textarea id="greeting" rows="2" placeholder="e.g., Hello {{name}}" oninput="updateCharCounter()"></textarea>
+                </div>
+                <div class="message-part">
+                    <label>Main Message:</label>
+                    <textarea id="message" rows="6" placeholder="Your main message here..." oninput="updateCharCounter()"></textarea>
+                </div>
+                <div class="message-part">
+                    <label>Closing:</label>
+                    <textarea id="closing" rows="2" placeholder="e.g., Thank you" oninput="updateCharCounter()"></textarea>
+                </div>
+            </div>
+            <div class="char-counter" id="charCounter">
+                <span id="currentLength">0</span> / 255 characters
+                <span id="charWarning" style="display: none; color: #f44336; margin-left: 10px;">⚠️ Too long!</span>
             </div>
             
-            <div class="message-section">
-                <label>Greeting:</label>
-                <textarea id="greeting" placeholder="Hello {{name}}," rows="2"></textarea>
+            <!-- Final Message Preview Box -->
+            <div class="message-preview-box" id="messagePreviewBox" style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 2px solid #dee2e6; margin-top: 15px;">
+                <h3 style="margin-top: 0;">Final Message Preview</h3>
+                <div id="finalMessagePreview" style="background: white; padding: 10px; border-radius: 4px; border: 1px solid #dee2e6; min-height: 60px; font-family: monospace;">
+                    Type your message above to see the preview...
+                </div>
+                <div id="placeholderResolution" style="margin-top: 10px; font-size: 0.9em; color: #666;"></div>
             </div>
             
-            <div class="message-section">
-                <label>Main Message:</label>
-                <textarea id="mainMessage" placeholder="Write your main message here..." rows="5"></textarea>
-            </div>
-            
-            <div class="message-section">
-                <label>Closing (Optional):</label>
-                <textarea id="closing" placeholder="Reply if interested." rows="2"></textarea>
-            </div>
-            
-            <div class="variables">
-                <strong>Available variables:</strong>
-                {{name}}, {{governorate}}, {{category}}, {{phone}}
+            <div class="variable-usage">
+                <h3>Variable Usage:</h3>
+                <p><code>{{name}}</code> - Contact's name</p>
+                <p><code>{{governorate}}</code> - Contact's governorate</p>
+                <p><code>{{category}}</code> - Contact's category</p>
+                <p><code>{{phone}}</code> - Contact's phone number</p>
             </div>
         </div>
 
         <div class="section">
-            <h2>4. Send Messages</h2>
+            <h2>3. Send Messages</h2>
             <div class="batch-controls">
                 <div class="batch-item">
                     <label>
@@ -214,7 +238,15 @@
             <!-- Pre-send summary box -->
             <div id="preSendSummary" style="display: none; margin-top: 15px; background: #e3f2fd; padding: 20px; border-radius: 8px; border: 2px solid #2196F3;">
                 <h3 style="margin-top: 0; color: #2c3e50;">📋 Pre-Send Summary</h3>
+                
+                <!-- Pre-send checklist -->
+                <div id="preSendChecklist" style="background: white; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6; margin-bottom: 15px;">
+                    <h4 style="margin-top: 0;">Pre-Send Checklist</h4>
+                    <div id="checklistItems"></div>
+                </div>
+                
                 <div id="preSendSummaryContent"></div>
+                
                 <div style="margin-top: 15px;">
                     <button onclick="confirmAndSend()" id="confirmSendBtn" style="background: #4CAF50; padding: 12px 24px; font-size: 16px;">✅ Confirm & Start Sending</button>
                     <button onclick="cancelSend()" style="background: #f44336; padding: 12px 24px; font-size: 16px; margin-left: 10px;">❌ Cancel</button>
@@ -223,6 +255,13 @@
                     <p style="margin: 0; color: #856404;"><strong>⚠️ For 200+ contacts, type <code>SEND NOW</code> to confirm:</strong></p>
                     <input type="text" id="sendNowInput" placeholder="Type SEND NOW" oninput="checkSendNowInput()" style="margin-top: 10px; padding: 8px; width: 200px;">
                 </div>
+            </div>
+            
+            <!-- Payload Debug Section -->
+            <div id="payloadDebug" style="display: none; margin-top: 15px; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 2px solid #6c757d;">
+                <h4 style="margin-top: 0;">🔍 Payload Debug</h4>
+                <div id="payloadKeys" style="margin-bottom: 10px;"></div>
+                <div id="lastPayload" style="background: white; padding: 10px; border-radius: 4px; border: 1px solid #dee2e6; font-family: monospace; font-size: 0.9em; overflow-x: auto;"></div>
             </div>
             <div id="progress"></div>
         </div>

@@ -205,7 +205,7 @@ app.post('/api/send', async (req, res) => {
 
           if (previousLogs && previousLogs.length > 0) {
             skipReason = 'duplicate_previous_run';
-            results.push({ phone, status: 'skipped', response: { message: 'Duplicate from previous run' } });
+            results.push({ phone, status: 'skipped', response: { message: 'This number was already contacted in a previous campaign or earlier in this session.' } });
 
             await supabase.from('message_logs').insert({
               phone: phone,
@@ -233,14 +233,16 @@ app.post('/api/send', async (req, res) => {
       personalizedMessage = personalizedMessage.replace(/\{\{category\}\}/g, recipient.category || '');
       personalizedMessage = personalizedMessage.replace(/\{\{phone\}\}/g, phone || '');
 
+      const payload = {
+        phone: phone,
+        message: personalizedMessage
+      };
+      console.log('Sending payload keys:', Object.keys(payload));
+
       const response = await fetch(`${NABDA_API_URL}/api/v1/messages/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': NABDA_API_TOKEN },
-        body: JSON.stringify({
-          phone: phone,
-          message: personalizedMessage,
-          cta_type: ctaType
-        })
+        body: JSON.stringify(payload)
       });
 
       const responseData = await response.json();
